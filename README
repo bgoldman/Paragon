@@ -1,0 +1,5 @@
+Paragon is a fully-featured Object Relational Mapper (ORM). It is to be used as a parent class for the Model in any PHP Model-View-Controller (MVC) codebase, or even as a standard ORM and data access layer in a non-MVC codebase.
+
+Paragon was written and is maintained by Brandon Goldman and is released as open source under the MIT License. Paragon is largely inspired by ActiveRecord from Ruby on Rails.
+
+
