@@ -173,7 +173,7 @@ class MysqliMasterSlaveDriver {
 		return $where_string;
 	}
 
-	private function paragon_condition($val) {
+	private function _paragon_condition($val) {
 		if ($val->type == 'gt') {
 			$predicate = '> \'' . $this->_slave->real_escape_string($val->value) . '\'';
 		} elseif ($val->type == 'gte') {
