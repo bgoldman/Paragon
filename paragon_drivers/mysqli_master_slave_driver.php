@@ -40,7 +40,7 @@ class MysqliMasterSlaveDriver {
 
 			if (!is_int($field)) {
 				if (strpos($field, '.') === false) {
-					$real_field_name = '`' . $table . '`.`' . $field. '`';
+					$real_field_name = '' . $table . '.`' . $field. '`';
 				} else {
 					$real_field_name = $field;
 				}
@@ -219,14 +219,14 @@ class MysqliMasterSlaveDriver {
 		foreach ($tables as $table => $fields) {
 			if ($fields === true) {
 				$primary_table = $table;
-				$tables_string .= ' `' . $table . '`';
+				$tables_string .= ' ' . $table;
 				continue;
 			}
 			
 			if (empty($primary_key)) $primary_key = $fields[0];
-			$part = 'LEFT JOIN `' . $table . '`';
+			$part = 'LEFT JOIN ' . $table;
 			$this_table = empty($fields[2]) ? $primary_table : $fields[2];
-			$part .= ' ON `' . $table . '`.' . $fields[1] . ' = `' . $this_table . '`.' . $fields[0];
+			$part .= ' ON ' . $table . '.' . $fields[1] . ' = ' . $this_table . '.' . $fields[0];
 			$tables_string .= ' ' . $part;
 		}
 
@@ -239,7 +239,7 @@ class MysqliMasterSlaveDriver {
 				
 		// add a group by if necessary
 		if (count($tables) > 0 && !empty($primary_key)) {
-			$query .= ' GROUP BY `' . $primary_table . '`.' . $primary_key . ' ';
+			$query .= ' GROUP BY ' . $primary_table . '.' . $primary_key . ' ';
 		}
 
 		// get the result
@@ -261,7 +261,7 @@ class MysqliMasterSlaveDriver {
 	
 		$table = $this->_master->real_escape_string($table);
 		$where_string = $this->_create_simple_where($this->_master, $keys, $key_values);
-		$query = 'DELETE FROM `' . $table . '`' . $where_string;
+		$query = 'DELETE FROM ' . $table . $where_string;
 		$result = $this->_master->query($query);
 		
 		if (!$result) {
@@ -285,13 +285,13 @@ class MysqliMasterSlaveDriver {
 		foreach ($tables as $table => $fields) {
 			if ($fields === true) {
 				$primary_table = $table;
-				$tables_string .= ' `' . $table . '`';
+				$tables_string .= ' ' . $table;
 				continue;
 			}
 			
-			$part = 'LEFT JOIN `' . $table . '`';
+			$part = 'LEFT JOIN ' . $table;
 			$this_table = empty($fields[2]) ? $primary_table : $fields[2];
-			$part .= ' ON `' . $table . '`.' . $fields[1] . ' = `' . $this_table . '`.' . $fields[0];
+			$part .= ' ON ' . $table . '.' . $fields[1] . ' = ' . $this_table . '.' . $fields[0];
 			$tables_string .= ' ' . $part;
 		}
 		
@@ -327,18 +327,18 @@ class MysqliMasterSlaveDriver {
 		foreach ($tables as $table => $fields) {
 			if ($fields === true) {
 				$primary_table = $table;
-				$tables_string .= ' `' . $table . '`';
+				$tables_string .= ' ' . $table;
 				continue;
 			}
 			
 			if (empty($primary_key)) $primary_key = $fields[0];
-			$part = 'LEFT JOIN `' . $table . '`';
+			$part = 'LEFT JOIN ' . $table;
 			$this_table = empty($fields[2]) ? $primary_table : $fields[2];
-			$part .= ' ON `' . $table . '`.' . $fields[1] . ' = `' . $this_table . '`.' . $fields[0];
+			$part .= ' ON ' . $table . '.' . $fields[1] . ' = ' . $this_table . '.' . $fields[0];
 			$tables_string .= ' ' . $part;
 		}
 		
-		$keys_string = '`' . $primary_table . '`.`' . implode('`, `' . $primary_table . '`.`', $keys) . '`';
+		$keys_string = $primary_table . '.`' . implode('`, ' . $primary_table . '.`', $keys) . '`';
 		$where_string = $this->_create_complex_where($this->_slave, $primary_table, $params);
 		
 		if ($where_string === false) {
@@ -349,7 +349,7 @@ class MysqliMasterSlaveDriver {
 		
 		// add a group by if necessary
 		if (count($tables) > 0 && !empty($primary_key)) {
-			$query .= ' GROUP BY `' . $primary_table . '`.' . $primary_key . ' ';
+			$query .= ' GROUP BY ' . $primary_table . '.' . $primary_key . ' ';
 		}
 
 		// add order by if necessary
@@ -419,7 +419,7 @@ class MysqliMasterSlaveDriver {
 			$fields_string = '`' . implode('`,`', $fields) . '`';
 			$values_string = implode(',', $values);
 		
-			$query = ' INSERT INTO `' . $table . '`'
+			$query = ' INSERT INTO ' . $table
 				   . ' (' . $fields_string . ')'
 				   . ' VALUES'
 				   . ' (' . $values_string . ')';
@@ -456,7 +456,7 @@ class MysqliMasterSlaveDriver {
 		$set_string = implode(', ', $sets);
 		
 		$where_string = $this->_create_simple_where($this->_master, $keys, $key_values);
-		$query = ' UPDATE `' . $table . '`'
+		$query = ' UPDATE ' . $table
 			   . ' SET ' . $set_string
 			   .   $where_string;
 		$result = $this->_master->query($query);
