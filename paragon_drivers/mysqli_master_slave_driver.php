@@ -223,7 +223,10 @@ class MysqliMasterSlaveDriver {
 				continue;
 			}
 			
-			if (empty($primary_key)) $primary_key = $fields[0];
+			if (empty($primary_key) && !empty($fields[3])) {
+				$primary_key = $fields[0];
+			}
+			
 			$part = 'LEFT JOIN ' . $table;
 			$this_table = empty($fields[2]) ? $primary_table : $fields[2];
 			$part .= ' ON ' . $table . '.' . $fields[1] . ' = ' . $this_table . '.' . $fields[0];
@@ -331,7 +334,10 @@ class MysqliMasterSlaveDriver {
 				continue;
 			}
 			
-			if (empty($primary_key)) $primary_key = $fields[0];
+			if (empty($primary_key) && !empty($fields[3])) {
+				$primary_key = $fields[0];
+			}
+			
 			$part = 'LEFT JOIN ' . $table;
 			$this_table = empty($fields[2]) ? $primary_table : $fields[2];
 			$part .= ' ON ' . $table . '.' . $fields[1] . ' = ' . $this_table . '.' . $fields[0];

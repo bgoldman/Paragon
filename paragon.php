@@ -697,9 +697,9 @@ class Paragon {
 				$primary_key = self::_get_static($relationship['class'], '_primary_key');
 				
 				if ($relationship['type'] == 'belongs_to') {
-					$tables[$relationship['table']] = array($relationship['foreign_key'], $primary_key);
+					$tables[$relationship['table']] = array($relationship['foreign_key'], $primary_key, null, false);
 				} elseif ($relationship['type'] == 'has_one' || $relationship['type'] == 'has_many' || $relationship['type'] == 'has_and_belongs_to_many') {
-					$tables[$relationship['table']] = array($primary_key, $relationship['primary_key']);
+					$tables[$relationship['table']] = array($primary_key, $relationship['primary_key'], null, true);
 				}
 			}
 		}
@@ -723,7 +723,7 @@ class Paragon {
 		}
 		
 		$filename = self::_translate_class_name_to_property($class);
-		$filename = dirname(__FILE__) . '/../../models/' . $filename . '.php';
+		$filename = dirname(__FILE__) . '/../../../models/' . $filename . '.php';
 		$filename = realpath($filename);
 		require_once $filename;
 	}
