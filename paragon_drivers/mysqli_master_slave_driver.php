@@ -470,5 +470,7 @@ class MysqliMasterSlaveDriver {
 		if (!$result) {
 			throw new Exception($this->_master->error . "\r\n" . $query);
 		}
+		
+		return true;
 	}
 }
