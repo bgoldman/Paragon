@@ -747,7 +747,7 @@ class Paragon {
 		}
 		
 		$filename = self::_translate_class_name_to_property($class);
-		$filename = dirname(__FILE__) . '/../../models/' . $filename . '.php';
+		$filename = dirname(__FILE__) . '/../../../models/' . $filename . '.php';
 		$filename = realpath($filename);
 		require_once $filename;
 	}
