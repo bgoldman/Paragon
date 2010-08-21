@@ -644,7 +644,12 @@ class Paragon {
 						$prefix1 = $relationship . '_';
 						$prefix2 = $relationship . '.';
 					
-						if (strpos($key, $prefix1) === 0 || strpos($key, $prefix2) === 0) {
+						if (
+							(
+								strpos($key, $prefix1) === 0
+								&& !in_array($key, $fields)
+							) || strpos($key, $prefix2) === 0
+						) {
 							if (in_array($key, $fields)) {
 								continue;
 							}
@@ -666,7 +671,12 @@ class Paragon {
 						$prefix1 = $relationship . '_';
 						$prefix2 = $relationship . '.';
 					
-						if (strpos($order, $prefix1) === 0 || strpos($order, $prefix2) === 0) {
+						if (
+							(
+								strpos($key, $prefix1) === 0
+								&& !in_array($key, $fields)
+							) || strpos($key, $prefix2) === 0
+						) {
 							if (empty($found_relationships[$relationship])) {
 								$found_relationships[$relationship] = array(
 									'conditions' => array(),
@@ -686,7 +696,14 @@ class Paragon {
 				foreach ($matches['conditions'] as $key => $data) {
 					$field = substr($key, strlen($relationship_key) + 1);
 					unset($params['conditions'][$key]);
-					$params['conditions'][$relationship['table'] . '.' . $field] = $data;
+					
+					if ($relationship['type'] == 'has_and_belongs_to_many') {
+						self::_init($relationship['class']);
+						$other_table = self::_get_static($relationship['class'], '_table');
+						$params['conditions'][$other_table . '.' . $field] = $data;
+					} else {
+						$params['conditions'][$relationship['table'] . '.' . $field] = $data;
+					}
 				}
 				
 				foreach ($matches['order'] as $key => $data) {
@@ -698,8 +715,15 @@ class Paragon {
 				
 				if ($relationship['type'] == 'belongs_to') {
 					$tables[$relationship['table']] = array($relationship['foreign_key'], $primary_key, null, false);
-				} elseif ($relationship['type'] == 'has_one' || $relationship['type'] == 'has_many' || $relationship['type'] == 'has_and_belongs_to_many') {
+				} elseif ($relationship['type'] == 'has_one' || $relationship['type'] == 'has_many') {
 					$tables[$relationship['table']] = array($primary_key, $relationship['primary_key'], null, true);
+				} elseif ($relationship['type'] == 'has_and_belongs_to_many') {
+					$this_primary_key = self::_get_static($class_name, '_primary_key');
+					self::_init($relationship['class']);
+					$other_table = self::_get_static($relationship['class'], '_table');
+					$other_primary_key = self::_get_static($relationship['class'], '_primary_key');
+					$tables[$relationship['table']] = array($this_primary_key, $relationship['primary_key']);
+					$tables[$other_table] = array($relationship['foreign_key'], $other_primary_key, $relationship['table'], true);
 				}
 			}
 		}
