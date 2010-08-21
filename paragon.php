@@ -723,7 +723,7 @@ class Paragon {
 					$other_table = self::_get_static($relationship['class'], '_table');
 					$other_primary_key = self::_get_static($relationship['class'], '_primary_key');
 					$tables[$relationship['table']] = array($this_primary_key, $relationship['primary_key']);
-					$tables[$other_table] = array($relationship['foreign_key'], $other_primary_key, $relationship['table'], true);
+					$tables[$other_table] = array($relationship['foreign_key'], $other_primary_key, $relationship['table'], false);
 				}
 			}
 		}
