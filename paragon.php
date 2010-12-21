@@ -715,7 +715,9 @@ class Paragon {
 				
 				if ($relationship['type'] == 'belongs_to') {
 					$tables[$relationship['table']] = array($relationship['foreign_key'], $primary_key, null, false);
-				} elseif ($relationship['type'] == 'has_one' || $relationship['type'] == 'has_many') {
+				} elseif ($relationship['type'] == 'has_many') {
+					$tables[$relationship['table']] = array($primary_key, $relationship['primary_key'], null, true);
+				} elseif ($relationship['type'] == 'has_one') {
 					$tables[$relationship['table']] = array($primary_key, $relationship['primary_key'], null, true);
 				} elseif ($relationship['type'] == 'has_and_belongs_to_many') {
 					$this_primary_key = self::_get_static($class_name, '_primary_key');
@@ -723,7 +725,7 @@ class Paragon {
 					$other_table = self::_get_static($relationship['class'], '_table');
 					$other_primary_key = self::_get_static($relationship['class'], '_primary_key');
 					$tables[$relationship['table']] = array($this_primary_key, $relationship['primary_key']);
-					$tables[$other_table] = array($relationship['foreign_key'], $other_primary_key, $relationship['table'], false);
+					$tables[$other_table] = array($relationship['foreign_key'], $other_primary_key, $relationship['table'], true);
 				}
 			}
 		}
@@ -747,7 +749,7 @@ class Paragon {
 		}
 		
 		$filename = self::_translate_class_name_to_property($class);
-		$filename = dirname(__FILE__) . '/../../../models/' . $filename . '.php';
+		$filename = dirname(__FILE__) . '/../../models/' . $filename . '.php';
 		$filename = realpath($filename);
 		require_once $filename;
 	}
@@ -1523,7 +1525,7 @@ if (!function_exists('get_called_class')) {
 		// and this regex needs to search at the beginning of the function call,
 		// and function calls might span more than one line.
 		// if the function call is more than 100 lines, this will fail.
-		for ($i = 0; $i < 100, $line_number > 0; $i++) {
+		for ($i = 0; $i < 100 && $line_number > 0; $i++) {
 			$line_number--;
 			preg_match("#([a-zA-Z0-9_]+){$type}{$func}( )*\(#", $file_lines[$line_number], $matches);
 
