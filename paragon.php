@@ -192,7 +192,7 @@ class Paragon {
 		self::_require_model($info['class']);
 		if (!is_array($params)) $params = array();
 		if (empty($params['conditions'])) $params['conditions'] = array();
-		$params = self::_single_relationship_params($info, $params);		$params = self::_single_relationship_params($info, $params);
+		$params = self::_single_relationship_params($info, $params);
 		$params['conditions'][$info['primary_key']] = $this->$primary_key;
 		return call_user_func(array($info['class'], $method), $params);
 	}
@@ -700,7 +700,8 @@ class Paragon {
 					if ($relationship['type'] == 'has_and_belongs_to_many') {
 						self::_init($relationship['class']);
 						$other_table = self::_get_static($relationship['class'], '_table');
-						$params['conditions'][$other_table . '.' . $field] = $data;
+						$other_primary_key = self::_get_static($relationship['class'], '_primary_key');
+						$params['conditions'][$other_table . '.' . $other_primary_key] = $data;
 					} else {
 						$params['conditions'][$relationship['table'] . '.' . $field] = $data;
 					}
@@ -725,7 +726,7 @@ class Paragon {
 					$other_table = self::_get_static($relationship['class'], '_table');
 					$other_primary_key = self::_get_static($relationship['class'], '_primary_key');
 					$tables[$relationship['table']] = array($this_primary_key, $relationship['primary_key']);
-					$tables[$other_table] = array($relationship['foreign_key'], $other_primary_key, $relationship['table'], true);
+					$tables[$other_table] = array($relationship['foreign_key'], $other_primary_key, $relationship['table'], false);
 				}
 			}
 		}
