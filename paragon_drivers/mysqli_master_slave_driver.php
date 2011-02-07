@@ -13,7 +13,7 @@ class MysqliMasterSlaveDriver {
 	// => id in (1, 2, 3)
 	
 	// keys = [one, two], values = [ [1.1,2.1], [1.2,2.2] ]
-	// => (one in [1.1] and two in [2.1])
+	// => (one in (1.1) and two in (2.1))
 	//    or (one in (1.2) and two in (2.2))
 	
 	// keys = [one, two], values =
