@@ -93,7 +93,7 @@ class MysqliMasterSlaveDriver {
 				
 				continue;
 			}
-			
+
 			if (strlen($val) > 0) $conditions[] = $val;
 		}
 
@@ -233,10 +233,10 @@ class MysqliMasterSlaveDriver {
 			$tables_string .= ' ' . $part;
 		}
 
-		$keys_string = implode('`,`', $keys);
+		$keys_string = $primary_table . '.`' . implode('`, ' . $primary_table . '.`', $keys) . '`';
 		$where_string = $this->_create_complex_where($this->_slave, $primary_table, $params);
 		
-		$query  = ' SELECT COUNT(*) AS count'
+		$query  = ' SELECT ' . $keys_string
 				. ' FROM ' . $tables_string
 				.   $where_string;
 				
@@ -246,6 +246,7 @@ class MysqliMasterSlaveDriver {
 		}
 
 		// get the result
+		$query = "SELECT COUNT(*) AS count FROM (" . $query . ") AS subquery";
 		$result = $this->_slave->query($query);
 		
 		if (!$result) {
@@ -318,9 +319,8 @@ class MysqliMasterSlaveDriver {
 		return $rows;
 	}
 	
-	public function find_primary_keys($requested_keys, $tables, $params) {
+	public function find_primary_keys($keys, $tables, $params) {
 		if (!is_array($tables)) $tables = array($tables => true);
-		$keys = $requested_keys;
 		if (!is_array($keys)) $keys = array($keys);
 		
 		$tables_string = '';
