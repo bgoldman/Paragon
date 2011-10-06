@@ -726,8 +726,10 @@ class Paragon {
 						self::_init($relationship['class']);
 						$other_table = self::_get_static($relationship['class'], '_table');
 						$other_primary_key = self::_get_static($relationship['class'], '_primary_key');
+						$real_key = substr($key, strlen($relationship_key) + 1);
+						$real_key = self::_alias($relationship['class'], $real_key);
 //						$params['conditions'][$other_table . '.' . $other_primary_key] = $data;
-						$params['conditions'][$relationship_key . '.' . $other_primary_key] = $data;
+						$params['conditions'][$relationship_key . '.' . $real_key] = $data;
 					} else {
 //						$params['conditions'][$relationship['table'] . '.' . $field] = $data;
 						$params['conditions'][$relationship_key . '.' . $field] = $data;
