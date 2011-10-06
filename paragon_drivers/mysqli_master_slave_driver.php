@@ -39,58 +39,27 @@ class MysqliMasterSlaveDriver {
 			}
 
 			if (!is_int($field)) {
-				if (strpos($field, '.') === false) {
-					$real_field_name = '' . $table . '.`' . $field. '`';
-				} else {
-					$real_field_name = $field;
+				$these_conditions = $this->_where_condition($table, $field, $val);
+				
+				foreach ($these_conditions as $condition) {
+					$conditions[] = $condition;
 				}
-
-				if ($val === null) {
-					$predicate = 'IS NULL';
-				} elseif (is_array($val)) {
-					if (!empty($val) && is_a($val[0], 'ParagonCondition')) {
-						$predicate = array();
-						
-						foreach ($val as $condition) {
-							$predicate_item = $this->_paragon_condition($condition);
-							
-							if (empty($predicate_item)) {
-								continue;
-							}
-							
-							$predicate[] = $predicate_item;
-						}
-					} else {
-						$vals = array();
-						
-						foreach ($val as $item) {
-							$item = $this->_slave->real_escape_string($item);
-							$vals[] = '\'' . $item . '\'';
-						}
-						
-						$predicate = 'IN (' . implode(',', $vals) . ')';
-					}
-				} elseif (is_string($val)) {
-					$val = $this->_slave->real_escape_string($val);
-					$predicate = '= \'' . $val . '\'';
-				} elseif (is_bool($val)) {
-					$predicate = '= ' . ($val ? 'true' : 'false');
-				} elseif (is_a($val, 'ParagonCondition')) {
-					$predicate = $this->_paragon_condition($val);
+				
+				continue;
+			}
+			
+			if (is_array($val)) {
+				$val_conditions = array();
+				
+				foreach ($val as $k => $v) {
+					$these_val_conditions = $this->_where_condition($table, $k, $v);
 					
-					if (empty($predicate)) {
-						continue;
+					foreach ($these_val_conditions as $val_condition) {
+						$val_conditions[] = $val_condition;
 					}
-				} else {
-					$predicate = '= ' . $val;
-				}
-
-				if (!is_array($predicate)) $predicate = array($predicate);
-				
-				foreach ($predicate as $pred) {
-					$conditions[] = $real_field_name . ' ' . $pred;
 				}
 				
+				$conditions[] = '(' . implode(' OR ', $val_conditions) . ')';
 				continue;
 			}
 
@@ -207,9 +176,67 @@ class MysqliMasterSlaveDriver {
 		
 		return $predicate;
 	}
+	
+	private function _where_condition($table, $field, $val) {
+		$conditions = array();
+		
+		if (strpos($field, '.') === false) {
+			$real_field_name = '' . $table . '.`' . $field. '`';
+		} else {
+			$real_field_name = $field;
+		}
+
+		if ($val === null) {
+			$predicate = 'IS NULL';
+		} elseif (is_array($val)) {
+			if (!empty($val) && is_a($val[0], 'ParagonCondition')) {
+				$predicate = array();
+				
+				foreach ($val as $condition) {
+					$predicate_item = $this->_paragon_condition($condition);
+					
+					if (empty($predicate_item)) {
+						continue;
+					}
+					
+					$predicate[] = $predicate_item;
+				}
+			} else {
+				$vals = array();
+				
+				foreach ($val as $item) {
+					$item = $this->_slave->real_escape_string($item);
+					$vals[] = '\'' . $item . '\'';
+				}
+				
+				$predicate = 'IN (' . implode(',', $vals) . ')';
+			}
+		} elseif (is_string($val)) {
+			$val = $this->_slave->real_escape_string($val);
+			$predicate = '= \'' . $val . '\'';
+		} elseif (is_bool($val)) {
+			$predicate = '= ' . ($val ? 'true' : 'false');
+		} elseif (is_a($val, 'ParagonCondition')) {
+			$predicate = $this->_paragon_condition($val);
+			
+			if (empty($predicate)) {
+				continue;
+			}
+		} else {
+			$predicate = '= ' . $val;
+		}
+
+		if (!is_array($predicate)) $predicate = array($predicate);
+		
+		foreach ($predicate as $pred) {
+			$conditions[] = $real_field_name . ' ' . $pred;
+		}
+		
+		return $conditions;
+	}
 		
 	public function count($keys, $tables, $params) {
-		if (!is_array($tables)) $tables = array($tables => true);
+		if (!is_array($tables)) $tables = array($tables => array($tables));
 		if (!is_array($keys)) $keys = array($keys);
 		
 		$tables_string = '';
@@ -217,19 +244,19 @@ class MysqliMasterSlaveDriver {
 		$primary_key = null;
 		
 		foreach ($tables as $table => $fields) {
-			if ($fields === true) {
+			if (count($fields) == 1) {
 				$primary_table = $table;
-				$tables_string .= ' ' . $table;
+				$tables_string .= ' ' . $fields[0] . ' AS ' . $table;
 				continue;
 			}
 			
-			if (empty($primary_key) && !empty($fields[3])) {
-				$primary_key = $fields[0];
+			if (empty($primary_key) && !empty($fields[4])) {
+				$primary_key = $fields[1];
 			}
 			
-			$part = 'LEFT JOIN ' . $table;
-			$this_table = empty($fields[2]) ? $primary_table : $fields[2];
-			$part .= ' ON ' . $table . '.' . $fields[1] . ' = ' . $this_table . '.' . $fields[0];
+			$part = 'LEFT JOIN ' . $fields[0] . ' AS ' . $table;
+			$this_table = empty($fields[3]) ? $primary_table : $fields[3];
+			$part .= ' ON ' . $table . '.' . $fields[2] . ' = ' . $this_table . '.' . $fields[1];
 			$tables_string .= ' ' . $part;
 		}
 
@@ -276,7 +303,7 @@ class MysqliMasterSlaveDriver {
 	}
 	
 	public function find_by_primary_keys($keys, $tables, $key_values) {
-		if (!is_array($tables)) $tables = array($tables => true);
+		if (!is_array($tables)) $tables = array($tables => array($tables));
 		
 		if (!is_array($keys)) {
 			$keys = array($keys);
@@ -285,17 +312,17 @@ class MysqliMasterSlaveDriver {
 	
 		$tables_string = '';
 		$primary_table = null;
-		
+
 		foreach ($tables as $table => $fields) {
-			if ($fields === true) {
+			if (count($fields) == 1) {
 				$primary_table = $table;
-				$tables_string .= ' ' . $table;
+				$tables_string .= ' ' . $fields[0] . ' AS ' . $table;
 				continue;
 			}
 			
-			$part = 'LEFT JOIN ' . $table;
-			$this_table = empty($fields[2]) ? $primary_table : $fields[2];
-			$part .= ' ON ' . $table . '.' . $fields[1] . ' = ' . $this_table . '.' . $fields[0];
+			$part = 'LEFT JOIN ' . $fields[0] . ' AS ' . $table;
+			$this_table = empty($fields[3]) ? $primary_table : $fields[3];
+			$part .= ' ON ' . $table . '.' . $fields[2] . ' = ' . $this_table . '.' . $fields[1];
 			$tables_string .= ' ' . $part;
 		}
 		
@@ -320,7 +347,7 @@ class MysqliMasterSlaveDriver {
 	}
 	
 	public function find_primary_keys($keys, $tables, $params) {
-		if (!is_array($tables)) $tables = array($tables => true);
+		if (!is_array($tables)) $tables = array($tables => array($tables));
 		if (!is_array($keys)) $keys = array($keys);
 		
 		$tables_string = '';
@@ -328,19 +355,19 @@ class MysqliMasterSlaveDriver {
 		$primary_key = null;
 		
 		foreach ($tables as $table => $fields) {
-			if ($fields === true) {
+			if (count($fields) == 1) {
 				$primary_table = $table;
-				$tables_string .= ' ' . $table;
+				$tables_string .= ' ' . $fields[0] . ' AS ' . $table;
 				continue;
 			}
 			
-			if (empty($primary_key) && !empty($fields[3])) {
-				$primary_key = $fields[0];
+			if (empty($primary_key) && !empty($fields[4])) {
+				$primary_key = $fields[1];
 			}
 			
-			$part = 'LEFT JOIN ' . $table;
-			$this_table = empty($fields[2]) ? $primary_table : $fields[2];
-			$part .= ' ON ' . $table . '.' . $fields[1] . ' = ' . $this_table . '.' . $fields[0];
+			$part = 'LEFT JOIN ' . $fields[0] . ' AS ' . $table;
+			$this_table = empty($fields[3]) ? $primary_table : $fields[3];
+			$part .= ' ON ' . $table . '.' . $fields[2] . ' = ' . $this_table . '.' . $fields[1];
 			$tables_string .= ' ' . $part;
 		}
 		

@@ -1,7 +1,7 @@
 <?php
 /*
 paragon.php
-Copyright (c) 2010 Brandon Goldman
+Copyright (c) 2011 Brandon Goldman
 Released under the MIT License.
 */
 
@@ -636,7 +636,8 @@ class Paragon {
 	
 	private static function _relationship_params($class_name, $params) {
 		$table = self::_get_static($class_name, '_table');
-		$tables = array($table => true);
+		$tables = array();
+		$tables[$table . '_primary'] = array($table);
 		$fields = self::_get_static($class_name, '_fields');
 		
 		if (!empty($params['order'])) {
@@ -725,9 +726,11 @@ class Paragon {
 						self::_init($relationship['class']);
 						$other_table = self::_get_static($relationship['class'], '_table');
 						$other_primary_key = self::_get_static($relationship['class'], '_primary_key');
-						$params['conditions'][$other_table . '.' . $other_primary_key] = $data;
+//						$params['conditions'][$other_table . '.' . $other_primary_key] = $data;
+						$params['conditions'][$relationship_key . '.' . $other_primary_key] = $data;
 					} else {
-						$params['conditions'][$relationship['table'] . '.' . $field] = $data;
+//						$params['conditions'][$relationship['table'] . '.' . $field] = $data;
+						$params['conditions'][$relationship_key . '.' . $field] = $data;
 					}
 				}
 				
@@ -742,7 +745,8 @@ class Paragon {
 					
 					$field = substr($order_field, strlen($relationship_key) + 1);
 					$field = self::_alias($relationship['class'], $field);
-					$order_parts[$key] = $relationship['table'] . '.' . $field . $suffix;
+//					$order_parts[$key] = $relationship['table'] . '.' . $field . $suffix;
+					$order_parts[$key] = $relationship_key . '.' . $field . $suffix;
 				}
 
 				$primary_key = self::_get_static($relationship['class'], '_primary_key');
@@ -752,11 +756,11 @@ class Paragon {
 				$relationship['foreign_key'] = self::_alias($relationship['class'], $relationship['foreign_key']);
 				
 				if ($relationship['type'] == 'belongs_to') {
-					$tables[$relationship['table']] = array($relationship['foreign_key'], $primary_key, null, false);
+					$tables[$relationship_key] = array($relationship['table'], $relationship['foreign_key'], $primary_key, null, false);
 				} elseif ($relationship['type'] == 'has_many') {
-					$tables[$relationship['table']] = array($relationship['primary_key_field'], $relationship['primary_key'], null, true);
+					$tables[$relationship_key] = array($relationship['table'], $relationship['primary_key_field'], $relationship['primary_key'], null, true);
 				} elseif ($relationship['type'] == 'has_one') {
-					$tables[$relationship['table']] = array($primary_key, $relationship['primary_key'], null, true);
+					$tables[$relationship_key] = array($relationship['table'], $primary_key, $relationship['primary_key'], null, true);
 				} elseif ($relationship['type'] == 'has_and_belongs_to_many') {
 					$this_primary_key = self::_get_static($class_name, '_primary_key');
 					$this_primary_key = self::_alias($class_name, $this_primary_key);
@@ -765,8 +769,8 @@ class Paragon {
 					$other_primary_key = self::_get_static($relationship['class'], '_primary_key');
 					$other_primary_key = self::_alias($relationship['class'], $other_primary_key);
 					$relationship['primary_key_field'] = self::_alias($relationship['class'], $relationship['primary_key_field']);
-					$tables[$relationship['table']] = array($relationship['primary_key_field'], $relationship['primary_key']);
-					$tables[$other_table] = array($relationship['foreign_key'], $other_primary_key, $relationship['table'], false);
+					$tables[$relationship_key . '_join'] = array($relationship['table'], $relationship['primary_key_field'], $relationship['primary_key']);
+					$tables[$relationship_key] = array($other_table, $relationship['foreign_key'], $other_primary_key, $relationship_key . '_join', false);
 				}
 			}
 		}
@@ -774,7 +778,8 @@ class Paragon {
 		if (!empty($order_parts)) {
 			foreach ($order_parts as $key => $order) {
 				if (!strpos($order, '.')) {
-					$order_parts[$key] = '`' . $table . '`.' . $order;
+//					$order_parts[$key] = '`' . $table . '`.' . $order;
+					$order_parts[$key] = '`' . $table . '_primary`.' . $order;
 				}
 			}
 			
