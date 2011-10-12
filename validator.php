@@ -170,14 +170,12 @@ class Validator {
 	 * Public Functions
 	 */
 
-	public function validate($rules = null) {
-		$this->_set_rules($rules);
-		$this->_set_fields($this->_data);
+	public function validate() {
 
 		foreach ($this->_rules as $field => $params) {
 			$value = isset($this->fields[$field]) ? $this->fields[$field] : '';
 			$label = !empty($params['label']) ? $params['label'] : $field;
-			$messages = array_merge($this->_error_formats, !empty($params['messages']) ? $params['messages'] : array());
+			$messages = !empty($params['messages']) ? array_merge($this->_error_formats, $params['messages']) : $this->_error_formats;
 			
 			if (!empty($params['required'])) {
 				if ($value == '') {
