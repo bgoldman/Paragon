@@ -196,7 +196,7 @@ class MysqliMasterSlaveDriver {
 					$predicate_item = $this->_paragon_condition($condition);
 					
 					if (empty($predicate_item)) {
-						continue;
+						return array();
 					}
 					
 					$predicate[] = $predicate_item;
@@ -220,7 +220,7 @@ class MysqliMasterSlaveDriver {
 			$predicate = $this->_paragon_condition($val);
 			
 			if (empty($predicate)) {
-				continue;
+				return array();
 			}
 		} else {
 			$predicate = '= ' . $val;
