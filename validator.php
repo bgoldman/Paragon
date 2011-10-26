@@ -138,7 +138,7 @@ class Validator {
 	}
 	
 	public static function check_exact_length($value, $length) {
-		return (strlen($value) != $length);
+		return (strlen($value) == $length);
 	}
 	
 	public static function check_max($value, $max) {
