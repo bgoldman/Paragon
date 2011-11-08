@@ -890,6 +890,16 @@ class Paragon {
 		return str_replace(' ', '', ucwords(str_replace(array('_', ' '), ' ', $property)));
 	}
 	
+	public static function all_to_json($objects) {
+		$array = array();
+		
+		foreach ($objects as $key => $object) {
+			$array[$key] = $object->__toArray();
+		}
+		
+		return json_encode($array);
+	}
+	
 	public static function condition($type, $value) {
 		return new ParagonCondition($type, $value);
 	}
@@ -1303,6 +1313,23 @@ class Paragon {
 		return null;
 	}
 	
+	public function __toArray() {
+		$class_name = get_class($this);
+		$array = array();
+		$fields = $this->fields();
+		$validations = self::_get_static($class_name, 'validations');
+		
+		foreach ($fields as $field) {
+			if (!empty($validations[$field]) && !empty($validations[$field]['private'])) {
+				continue;
+			}
+		
+			$array[$field] = $this->$field;
+		}
+		
+		return $array;
+	}
+	
 	public function add_relationship($property, $instance) {
 		$class_name = get_class($this);
 		$connection = self::_get_connection($class_name);
@@ -1562,6 +1589,11 @@ class Paragon {
 		}
 
 		$this->_set_values($data, false);
+	}
+		
+	public function to_json() {
+		$array = $this->__toArray();
+		return json_encode($array);
 	}
 	
 	public function total($function, $conditions = array()) {
