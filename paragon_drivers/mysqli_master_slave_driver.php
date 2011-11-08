@@ -1,7 +1,7 @@
 <?php
 /*
 paragon/drivers/mysqli_master_slave_driver.php
-Copyright (c) 2010 Brandon Goldman
+Copyright (c) 2011 Brandon Goldman
 Released under the MIT License.
 */
 
