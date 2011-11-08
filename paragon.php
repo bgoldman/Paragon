@@ -623,8 +623,6 @@ class Paragon {
 				if (!empty($aliases[$order])) {
 					$order = $aliases[$order];
 				}
-				
-//				$order = '`' . $order . '`';
 			}
 			
 			if ($modifier == 'desc') {
@@ -825,7 +823,7 @@ class Paragon {
 		if (!empty($order_parts)) {
 			foreach ($order_parts as $key => $order) {
 				if (!strpos($order, '.')) {
-					$order_parts[$key] = '`' . $table . '_primary`.' . $order;
+					$order_parts[$key] = $table . '_primary.' . $order;
 				}
 			}
 			
