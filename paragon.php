@@ -375,13 +375,21 @@ class Paragon {
 			$data_items = self::_get_data($class_name, $ids_to_get);
 
 			foreach ($data_items as $data) {
+				$fields_to_unset = array();
+				
 				foreach ($aliases as $field => $real_field) {
 					if (array_key_exists($real_field, $data)) {
 						$data[$field] = $data[$real_field];
-						unset($data[$real_field]);
+						$fields_to_unset[] = $real_field;
 					}
 				}
-			
+		
+				foreach ($fields_to_unset as $field) {
+					if (isset($data[$field])) {
+						unset($data[$field]);
+					}
+				}
+		
 				$instance = self::_new_instance($class_name, $data);
 				$id = $instance->$primary_key;
 				self::$_object_cache[$class_name][$id] = $instance;
@@ -638,6 +646,7 @@ class Paragon {
 		$table = self::_get_static($class_name, '_table');
 		$tables = array();
 		$tables[$table . '_primary'] = array($table);
+		$extra_tables = array();
 		$fields = self::_get_static($class_name, '_fields');
 		
 		if (!empty($params['order'])) {
@@ -728,11 +737,37 @@ class Paragon {
 						$other_primary_key = self::_get_static($relationship['class'], '_primary_key');
 						$real_key = substr($key, strlen($relationship_key) + 1);
 						$real_key = self::_alias($relationship['class'], $real_key);
-//						$params['conditions'][$other_table . '.' . $other_primary_key] = $data;
 						$params['conditions'][$relationship_key . '.' . $real_key] = $data;
 					} else {
-//						$params['conditions'][$relationship['table'] . '.' . $field] = $data;
-						$params['conditions'][$relationship_key . '.' . $field] = $data;
+						if (strpos($field, '.')) {
+							list ($these_tables, $these_params) = self::_relationship_params($relationship['class'], array(
+								'conditions' => array(
+									$field => $data,
+								),
+							));
+							
+							foreach ($these_params['conditions'] as $condition => $value) {
+								$params['conditions'][$condition] = $value;
+							}
+							
+							foreach ($these_tables as $this_table => $table_info) {
+								if ($table_info === true) {
+									continue;
+								}
+								
+								if (!empty($extra_tables[$this_table])) {
+									continue;
+								}
+
+								if (empty($table_info[2])) {
+									$table_info[2] = $relationship['table'];
+								}
+								
+								$extra_tables[$this_table] = $table_info;
+							}
+						} else {
+							$params['conditions'][$relationship_key . '.' . $field] = $data;
+						}
 					}
 				}
 				
@@ -747,7 +782,6 @@ class Paragon {
 					
 					$field = substr($order_field, strlen($relationship_key) + 1);
 					$field = self::_alias($relationship['class'], $field);
-//					$order_parts[$key] = $relationship['table'] . '.' . $field . $suffix;
 					$order_parts[$key] = $relationship_key . '.' . $field . $suffix;
 				}
 
@@ -758,7 +792,10 @@ class Paragon {
 				$relationship['foreign_key'] = self::_alias($relationship['class'], $relationship['foreign_key']);
 				
 				if ($relationship['type'] == 'belongs_to') {
-					$tables[$relationship_key] = array($relationship['table'], $relationship['foreign_key'], $primary_key, null, false);
+					$foreign_key = self::_alias($class_name, $relationship['foreign_key']);
+					$other_primary_key = self::_get_static($relationship['class'], '_primary_key');
+					$other_primary_key = self::_alias($relationship['class'], $other_primary_key);
+					$tables[$relationship_key] = array($relationship['table'], $foreign_key, $other_primary_key, null, false);
 				} elseif ($relationship['type'] == 'has_many') {
 					$tables[$relationship_key] = array($relationship['table'], $relationship['primary_key_field'], $relationship['primary_key'], null, true);
 				} elseif ($relationship['type'] == 'has_one') {
@@ -777,10 +814,17 @@ class Paragon {
 			}
 		}
 		
+		foreach ($extra_tables as $this_table => $info) {
+			if (!empty($tables[$this_table])) {
+				continue;
+			}
+			
+			$tables[$this_table] = $info;
+		}
+		
 		if (!empty($order_parts)) {
 			foreach ($order_parts as $key => $order) {
 				if (!strpos($order, '.')) {
-//					$order_parts[$key] = '`' . $table . '`.' . $order;
 					$order_parts[$key] = '`' . $table . '_primary`.' . $order;
 				}
 			}
@@ -920,13 +964,52 @@ class Paragon {
 			unset($params['conditions']['__primary_key__']);
 		}
 		
-		// if we have a params array with only one condition in it, and the condition is the primary key, pretend we just passed in an id
+		// if we have a params array with only one condition in it,
+		// and the condition is the primary key,
+		// we have shortcuts to try
 		if (
-			count($params) == 1 && isset($params['conditions'])
+			isset($params['conditions'])
 			&& count($params['conditions']) == 1
 			&& isset($params['conditions'][$primary_key])
 		) {
-			return call_user_func(array($class_name, 'find'), $params['conditions'][$primary_key]);
+			$return_array = (count($params) > 1);
+			
+			// if the primary key is an array containing only one item,
+			// then replace it with the value of the item
+			// and make sure we return an array
+			if (
+				is_array($params['conditions'][$primary_key])
+				&& count($params['conditions'][$primary_key]) == 1
+			) {
+				$params['conditions'][$primary_key] = $params['conditions'][$primary_key][0];
+				$return_array = true;
+			}
+			
+			// if we have a params array specifying an order,
+			// the primary key is scalar,
+			// then the order doesn't matter and we can remove it
+			if (
+				isset($params['order'])
+				&& is_scalar($params['conditions'][$primary_key])
+			) {
+				unset($params['order']);
+			}
+			
+			// if there is only one param,
+			// and if the primary key is scalar,
+			// pretend we just passed in an id
+			if (
+				count($params) == 1
+				&& is_scalar($params['conditions'][$primary_key])
+			) {
+				$instance = call_user_func(array($class_name, 'find'), $params['conditions'][$primary_key]);
+
+				if ($return_array && !empty($instance)) {
+					return array($instance);
+				}
+				
+				return $instance;
+			}
 		}
 
 		if (
@@ -1104,11 +1187,13 @@ class Paragon {
 	 */
 	 
 	public function __call($function, $args = null) {
+		if (empty($args)) {
+			return self::__get($function);
+		}
+		
 		$class_name = get_class($this);
 		$primary_key = self::_get_static($class_name, '_primary_key');
 		$relationships = self::_get_static($class_name, '_relationships');
-		
-		if (empty($args)) $args = array(0 => null);
 
 		if (isset($relationships['belongs_to'][$function])) {
 			$method = '_rel_belongs_to';
@@ -1131,11 +1216,12 @@ class Paragon {
 			
 			$params = $args[0];
 			
-			if (is_array($params) && !empty($params['conditions'])) {
-				if (array_key_exists($relationship['foreign_key'], $params['conditions'])) {
-					$params['conditions']['__primary_key__'] = $params['conditions'][$relationship['foreign_key']];
-					unset($params['conditions'][$relationship['foreign_key']]);
-				}
+			if (
+				is_array($params) && !empty($params['conditions'])
+				&& array_key_exists($relationship['foreign_key'], $params['conditions'])
+			) {
+				$params['conditions']['__primary_key__'] = $params['conditions'][$relationship['foreign_key']];
+				unset($params['conditions'][$relationship['foreign_key']]);
 			}
 			
 			return call_user_func(array($this, $method), $function, $params);
@@ -1155,7 +1241,7 @@ class Paragon {
 			$instance = $this->_relationship_instances[$property];
 			
 			if (!empty($field)) {
-				return ($instance != null) ? $instance->$field : null;
+				return ($instance != null && !is_array($instance)) ? $instance->$field : null;
 			}
 			
 			return $instance;
@@ -1186,7 +1272,9 @@ class Paragon {
 				return array();
 			}
 			
-			return $this->_rel_has_and_belongs_to_many($property);
+			$instances = $this->_rel_has_and_belongs_to_many($property);
+			$this->_relationship_instances[$property] = $instances;
+			return $instances;
 		}
 		
 		if (isset($relationships['has_many'][$property])) {
@@ -1194,9 +1282,9 @@ class Paragon {
 				return array();
 			}
 			
-			$instance = $this->_rel_has_many($property);
-			$this->_relationship_instances[$property] = $instance;
-			return $instance;
+			$instances = $this->_rel_has_many($property);
+			$this->_relationship_instances[$property] = $instances;
+			return $instances;
 		}
 		
 		if (isset($relationships['has_one'][$property])) {
