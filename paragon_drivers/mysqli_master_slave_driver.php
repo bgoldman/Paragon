@@ -236,7 +236,16 @@ class MysqliMasterSlaveDriver {
 	}
 		
 	public function count($keys, $tables, $params) {
-		if (!is_array($tables)) $tables = array($tables => array($tables));
+		if (!is_array($tables)) {
+			$table = $tables;
+			$tables = array(
+				$table => array(
+					'table' => $table,
+					'type' => 'primary',
+				),
+			);
+		}
+		
 		if (!is_array($keys)) $keys = array($keys);
 		
 		$tables_string = '';
@@ -244,19 +253,19 @@ class MysqliMasterSlaveDriver {
 		$primary_key = null;
 		
 		foreach ($tables as $table => $fields) {
-			if (count($fields) == 1) {
+			if ($fields['type'] == 'primary') {
 				$primary_table = $table;
-				$tables_string .= ' ' . $fields[0] . ' AS ' . $table;
+				$tables_string .= ' ' . $fields['table'] . ' AS ' . $table;
 				continue;
 			}
 			
-			if (empty($primary_key) && !empty($fields[4])) {
-				$primary_key = $fields[1];
+			if (empty($primary_key) && !empty($fields['set_primary_key'])) {
+				$primary_key = reset($keys);
 			}
 			
-			$part = 'LEFT JOIN ' . $fields[0] . ' AS ' . $table;
-			$this_table = empty($fields[3]) ? $primary_table : $fields[3];
-			$part .= ' ON ' . $table . '.' . $fields[2] . ' = ' . $this_table . '.' . $fields[1];
+			$part = 'LEFT JOIN ' . $fields['table'] . ' AS ' . $table;
+			$this_table = !empty($fields['intermediary_table']) ? $fields['intermediary_table'] : $primary_table;
+			$part .= ' ON ' . $table . '.' . $fields['foreign_key'] . ' = ' . $this_table . '.' . $fields['primary_key'];
 			$tables_string .= ' ' . $part;
 		}
 
@@ -303,7 +312,15 @@ class MysqliMasterSlaveDriver {
 	}
 	
 	public function find_by_primary_keys($keys, $tables, $key_values) {
-		if (!is_array($tables)) $tables = array($tables => array($tables));
+		if (!is_array($tables)) {
+			$table = $tables;
+			$tables = array(
+				$table => array(
+					'table' => $table,
+					'type' => 'primary',
+				),
+			);
+		}
 		
 		if (!is_array($keys)) {
 			$keys = array($keys);
@@ -314,15 +331,15 @@ class MysqliMasterSlaveDriver {
 		$primary_table = null;
 
 		foreach ($tables as $table => $fields) {
-			if (count($fields) == 1) {
+			if ($fields['type'] == 'primary') {
 				$primary_table = $table;
-				$tables_string .= ' ' . $fields[0] . ' AS ' . $table;
+				$tables_string .= ' ' . $fields['table'] . ' AS ' . $table;
 				continue;
 			}
 			
-			$part = 'LEFT JOIN ' . $fields[0] . ' AS ' . $table;
-			$this_table = empty($fields[3]) ? $primary_table : $fields[3];
-			$part .= ' ON ' . $table . '.' . $fields[2] . ' = ' . $this_table . '.' . $fields[1];
+			$part = 'LEFT JOIN ' . $fields['table'] . ' AS ' . $table;
+			$this_table = !empty($fields['intermediary_table']) ? $fields['intermediary_table'] : $primary_table;
+			$part .= ' ON ' . $table . '.' . $fields['foreign_key'] . ' = ' . $this_table . '.' . $fields['primary_key'];
 			$tables_string .= ' ' . $part;
 		}
 		
@@ -347,7 +364,16 @@ class MysqliMasterSlaveDriver {
 	}
 	
 	public function find_primary_keys($keys, $tables, $params) {
-		if (!is_array($tables)) $tables = array($tables => array($tables));
+		if (!is_array($tables)) {
+			$table = $tables;
+			$tables = array(
+				$table => array(
+					'table' => $table,
+					'type' => 'primary',
+				),
+			);
+		}
+		
 		if (!is_array($keys)) $keys = array($keys);
 		
 		$tables_string = '';
@@ -355,19 +381,19 @@ class MysqliMasterSlaveDriver {
 		$primary_key = null;
 		
 		foreach ($tables as $table => $fields) {
-			if (count($fields) == 1) {
+			if ($fields['type'] == 'primary') {
 				$primary_table = $table;
-				$tables_string .= ' ' . $fields[0] . ' AS ' . $table;
+				$tables_string .= ' ' . $fields['table'] . ' AS ' . $table;
 				continue;
 			}
 			
-			if (empty($primary_key) && !empty($fields[4])) {
-				$primary_key = $fields[1];
+			if (empty($primary_key) && !empty($fields['set_primary_key'])) {
+				$primary_key = reset($keys);
 			}
-			
-			$part = 'LEFT JOIN ' . $fields[0] . ' AS ' . $table;
-			$this_table = empty($fields[3]) ? $primary_table : $fields[3];
-			$part .= ' ON ' . $table . '.' . $fields[2] . ' = ' . $this_table . '.' . $fields[1];
+
+			$part = 'LEFT JOIN ' . $fields['table'] . ' AS ' . $table;
+			$this_table = !empty($fields['intermediary_table']) ? $fields['intermediary_table'] : $primary_table;
+			$part .= ' ON ' . $table . '.' . $fields['foreign_key'] . ' = ' . $this_table . '.' . $fields['primary_key'];
 			$tables_string .= ' ' . $part;
 		}
 		

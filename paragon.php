@@ -643,7 +643,10 @@ class Paragon {
 	private static function _relationship_params($class_name, $params) {
 		$table = self::_get_static($class_name, '_table');
 		$tables = array();
-		$tables[$table . '_primary'] = array($table);
+		$tables[$table . '_primary'] = array(
+			'table' => $table,
+			'type' => 'primary',
+		);
 		$extra_tables = array();
 		$fields = self::_get_static($class_name, '_fields');
 		
@@ -738,7 +741,7 @@ class Paragon {
 						$params['conditions'][$relationship_key . '.' . $real_key] = $data;
 					} else {
 						if (strpos($field, '.')) {
-							list ($these_tables, $these_params) = self::_relationship_params($relationship['class'], array(
+							list($these_tables, $these_params) = self::_relationship_params($relationship['class'], array(
 								'conditions' => array(
 									$field => $data,
 								),
@@ -749,16 +752,16 @@ class Paragon {
 							}
 							
 							foreach ($these_tables as $this_table => $table_info) {
-								if ($table_info === true) {
+								if ($table_info['type'] == 'primary') {
 									continue;
 								}
 								
 								if (!empty($extra_tables[$this_table])) {
 									continue;
 								}
-
-								if (empty($table_info[2])) {
-									$table_info[2] = $relationship['table'];
+								
+								if (empty($table_info['intermediary_table'])) {
+									$table_info['intermediary_table'] = $relationship['table'];
 								}
 								
 								$extra_tables[$this_table] = $table_info;
@@ -793,11 +796,29 @@ class Paragon {
 					$foreign_key = self::_alias($class_name, $relationship['foreign_key']);
 					$other_primary_key = self::_get_static($relationship['class'], '_primary_key');
 					$other_primary_key = self::_alias($relationship['class'], $other_primary_key);
-					$tables[$relationship_key] = array($relationship['table'], $foreign_key, $other_primary_key, null, false);
+					$tables[$relationship_key] = array(
+						'table' => $relationship['table'],
+						'primary_key' => $foreign_key,
+						'foreign_key' => $other_primary_key,
+						'set_primary_key' => false,
+						'type' => 'belongs_to',
+					);
 				} elseif ($relationship['type'] == 'has_many') {
-					$tables[$relationship_key] = array($relationship['table'], $relationship['primary_key_field'], $relationship['primary_key'], null, true);
+					$tables[$relationship_key] = array(
+						'table' => $relationship['table'],
+						'primary_key' => $relationship['primary_key_field'],
+						'foreign_key' => $relationship['primary_key'],
+						'set_primary_key' => true,
+						'type' => 'has_many',
+					);
 				} elseif ($relationship['type'] == 'has_one') {
-					$tables[$relationship_key] = array($relationship['table'], $primary_key, $relationship['primary_key'], null, true);
+					$tables[$relationship_key] = array(
+						'table' => $relationship['table'],
+						'primary_key' => $primary_key,
+						'foreign_key' => $relationship['primary_key'],
+						'set_primary_key' => true,
+						'type' => 'has_one',
+					);
 				} elseif ($relationship['type'] == 'has_and_belongs_to_many') {
 					$this_primary_key = self::_get_static($class_name, '_primary_key');
 					$this_primary_key = self::_alias($class_name, $this_primary_key);
@@ -806,8 +827,21 @@ class Paragon {
 					$other_primary_key = self::_get_static($relationship['class'], '_primary_key');
 					$other_primary_key = self::_alias($relationship['class'], $other_primary_key);
 					$relationship['primary_key_field'] = self::_alias($relationship['class'], $relationship['primary_key_field']);
-					$tables[$relationship_key . '_join'] = array($relationship['table'], $relationship['primary_key_field'], $relationship['primary_key']);
-					$tables[$relationship_key] = array($other_table, $relationship['foreign_key'], $other_primary_key, $relationship_key . '_join', false);
+					$tables[$relationship_key . '_join'] = array(
+						'table' => $relationship['table'],
+						'primary_key' => $relationship['primary_key_field'], 
+						'foreign_key' => $relationship['primary_key'],
+						'set_primary_key' => false,
+						'type' => 'has_and_belongs_to_many',
+					);
+					$tables[$relationship_key] = array(
+						'table' => $other_table,
+						'primary_key' => $relationship['foreign_key'],
+						'foreign_key' => $other_primary_key,
+						'intermediary_table' => $relationship_key . '_join',
+						'set_primary_key' => true,
+						'type' => 'has_and_belongs_to_many',
+					);
 				}
 			}
 		}
