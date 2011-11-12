@@ -736,39 +736,38 @@ class Paragon {
 						self::_init($relationship['class']);
 						$other_table = self::_get_static($relationship['class'], '_table');
 						$other_primary_key = self::_get_static($relationship['class'], '_primary_key');
-						$real_key = substr($key, strlen($relationship_key) + 1);
-						$real_key = self::_alias($relationship['class'], $real_key);
-						$params['conditions'][$relationship_key . '.' . $real_key] = $data;
-					} else {
-						if (strpos($field, '.')) {
-							list($these_tables, $these_params) = self::_relationship_params($relationship['class'], array(
-								'conditions' => array(
-									$field => $data,
-								),
-							));
-							
-							foreach ($these_params['conditions'] as $condition => $value) {
-								$params['conditions'][$condition] = $value;
-							}
-							
-							foreach ($these_tables as $this_table => $table_info) {
-								if ($table_info['type'] == 'primary') {
-									continue;
-								}
-								
-								if (!empty($extra_tables[$this_table])) {
-									continue;
-								}
-								
-								if (empty($table_info['intermediary_table'])) {
-									$table_info['intermediary_table'] = $relationship['table'];
-								}
-								
-								$extra_tables[$this_table] = $table_info;
-							}
-						} else {
-							$params['conditions'][$relationship_key . '.' . $field] = $data;
+						$real_key = self::_alias($relationship['class'], $field);
+						$field = $real_key;
+					}
+					
+					if (strpos($field, '.')) {
+						list($these_tables, $these_params) = self::_relationship_params($relationship['class'], array(
+							'conditions' => array(
+								$field => $data,
+							),
+						));
+						
+						foreach ($these_params['conditions'] as $condition => $value) {
+							$params['conditions'][$condition] = $value;
 						}
+						
+						foreach ($these_tables as $this_table => $table_info) {
+							if ($table_info['type'] == 'primary') {
+								continue;
+							}
+							
+							if (!empty($extra_tables[$this_table])) {
+								continue;
+							}
+
+							if (empty($table_info['intermediary_table'])) {
+								$table_info['intermediary_table'] = $relationship_key;
+							}
+							
+							$extra_tables[$this_table] = $table_info;
+						}
+					} else {
+						$params['conditions'][$relationship_key . '.' . $field] = $data;
 					}
 				}
 				
