@@ -5,7 +5,7 @@ require_once '../paragon_drivers/mysqli_master_slave_driver.php';
 
 // setting the connection
 // you only need to do this once in the whole script
-$myslqi = new Mysqli('localhost', 'username', 'password', 'database');
+$mysqli = new Mysqli('localhost', 'username', 'password', 'database');
 $driver = new MysqliMasterSlaveDriver(array(
 	'master' => $mysqli,
 	'slave' => $mysqli,
