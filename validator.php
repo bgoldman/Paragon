@@ -184,6 +184,8 @@ class Validator {
 					$this->errors[$field] = sprintf($messages['required'], $label);
 					continue;
 				}
+			} elseif (strlen($value) == 0) {
+				continue;
 			}
 			
 			if (!empty($params['date']) || !empty($params['datetime'])) {
