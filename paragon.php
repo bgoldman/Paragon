@@ -1062,6 +1062,7 @@ class Paragon {
 			&& !isset($params['order'])
 		) {
 			$primary_keys = $params['conditions'][$primary_key];
+			if (is_scalar($primary_keys)) $primary_keys = array($primary_keys);
 		} else {
 			$primary_keys = self::find_primary_keys($params);
 		}
