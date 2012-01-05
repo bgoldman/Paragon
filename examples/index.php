@@ -1,7 +1,7 @@
 <?php
 // include the files
 require_once '../paragon.php';
-require_once '../paragon_drivers/mysqli_master_slave_driver.php';
+require_once '../drivers/mysqli_master_slave_driver.php';
 
 // setting the connection
 // you only need to do this once in the whole script
