@@ -1141,13 +1141,13 @@ class Paragon {
 		$count = call_user_func(array($class_name, 'count'), array('conditions' => $conditions));
 		
 		if (!empty($params['page']) && $params['page'] > 0) {
-			$page = $params['page'];
+			$page = (int) $params['page'];
 		} else {
 			$page = 1;
 		}
 		
 		if (!empty($params['per_page']) && $params['per_page'] > 0) {
-			$per_page = $params['per_page'];
+			$per_page = (int) $params['per_page'];
 		} else {
 			$per_page = 10;
 		}

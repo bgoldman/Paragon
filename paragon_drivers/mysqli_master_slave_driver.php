@@ -290,7 +290,7 @@ class MysqliMasterSlaveDriver {
 		}
 
 		$row = $result->fetch_assoc();
-		return !empty($row) ? $row['count'] : 0;
+		return !empty($row) ? (int) $row['count'] : 0;
 	}
 	
 	public function delete_by_primary_keys($keys, $table, $key_values) {
