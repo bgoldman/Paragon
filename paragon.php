@@ -941,6 +941,17 @@ class Paragon {
 		if (empty($params)) {
 			return 0;
 		}
+		
+		// check if any conditions have an empty array of values.
+		// this would always imply empty results since
+		// "IN ()" means there are no values to search against.
+		if (!empty($params['conditions'])) {
+			foreach ($params['conditions'] as $key => $val) {
+				if (is_array($val) && empty($val)) {
+					return 0;
+				}
+			}
+		}
 
 		$class_name = get_called_class();
 		self::_init($class_name);
