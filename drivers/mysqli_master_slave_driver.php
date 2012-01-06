@@ -189,6 +189,9 @@ class MysqliMasterSlaveDriver {
 		if ($val === null) {
 			$predicate = 'IS NULL';
 		} elseif (is_array($val)) {
+			// renumber the array so $val[0] exists
+			$val = array_values($val);
+
 			if (!empty($val) && is_a($val[0], 'ParagonCondition')) {
 				$predicate = array();
 				
