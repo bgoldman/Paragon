@@ -985,8 +985,16 @@ class Paragon {
 	}
 	
 	public static function find($params) {
-		// if we have no params, return an empty array for an empty array input or null for anything other input
-		if (empty($params)) {
+		// if we have no params,
+		// or if limit is set to 0
+		// return an empty array for an empty array input, or null for anything other input
+		if (
+			empty($params)
+			|| (
+				isset($params['limit'])
+				&& $params['limit'] == 0
+			)
+		) {
 			return is_array($params) ? array() : null;
 		}
 		
@@ -1051,8 +1059,14 @@ class Paragon {
 			// and if the primary key is scalar,
 			// pretend we just passed in an id
 			if (
-				count($params) == 1
-				&& is_scalar($params['conditions'][$primary_key])
+				is_scalar($params['conditions'][$primary_key])
+				&& (
+					count($params) == 1
+					|| (
+						(empty($params['limit']) || $params['limit'] == 1)
+						&& empty($params['offset'])
+					)
+				)
 			) {
 				$instance = call_user_func(array($class_name, 'find'), $params['conditions'][$primary_key]);
 
@@ -1075,7 +1089,7 @@ class Paragon {
 			$primary_keys = $params['conditions'][$primary_key];
 			if (is_scalar($primary_keys)) $primary_keys = array($primary_keys);
 		} else {
-			$primary_keys = self::find_primary_keys($params);
+			$primary_keys = call_user_func(array($class_name, 'find_primary_keys'), $params);
 		}
 		
 		if (empty($primary_keys)) {
@@ -1087,6 +1101,18 @@ class Paragon {
 	}
 	
 	public static function find_one($params) {
+		// if we have no params, return an empty array for an empty array input or null for anything other input
+		if (empty($params)) {
+			return is_array($params) ? array() : null;
+		}
+		
+		// if we a scalar value, it's probably an id,
+		// so return the first result by this id
+		if (is_scalar($params)) {
+			$instances = self::_get_instances($class_name, array($params));
+			return !empty($instances) ? $instances[0] : null;
+		}
+
 		$params['limit'] = 1;
 		$class_name = get_called_class();
 		$instances = call_user_func(array($class_name, 'find'), $params);
@@ -1247,6 +1273,7 @@ class Paragon {
 		$class_name = get_class($this);
 		$primary_key = self::_get_static($class_name, '_primary_key');
 		$relationships = self::_get_static($class_name, '_relationships');
+		$relationship = null;
 
 		if (isset($relationships['belongs_to'][$function])) {
 			$method = '_rel_belongs_to';
@@ -1270,7 +1297,8 @@ class Paragon {
 			$params = $args[0];
 			
 			if (
-				is_array($params) && !empty($params['conditions'])
+				is_array($params)
+				&& !empty($params['conditions'])
 				&& array_key_exists($relationship['foreign_key'], $params['conditions'])
 			) {
 				$params['conditions']['__primary_key__'] = $params['conditions'][$relationship['foreign_key']];
@@ -1284,78 +1312,99 @@ class Paragon {
 	}
 
 	public function __get($property) {
+		$class_name = get_class($this);
+		$primary_key = self::_get_static($class_name, '_primary_key');
+		
+		if (!isset($this->$primary_key)) {
+			return null;
+		}
+
+		if ($property === '__primary_key__') {
+			return $this->$primary_key;
+		}
+		
+		$field = null;
+		
 		if (strpos($property, '.')) {
 			$relationship = substr($property, 0, strpos($property, '.'));
 			$field = substr($property, strpos($property, '.') + 1);
 			$property = $relationship;
 		}
-
+		
+		$instance = null;
+		
 		if (isset($this->_relationship_instances[$property])) {
 			$instance = $this->_relationship_instances[$property];
-			
-			if (!empty($field)) {
-				return ($instance != null && !is_array($instance)) ? $instance->$field : null;
-			}
-			
-			return $instance;
 		}
 		
-		$class_name = get_class($this);
-		$primary_key = self::_get_static($class_name, '_primary_key');
-
-		if ($property === '__primary_key__') {
-			return $this->$primary_key;
-		}
-	
+		$cache = self::_get_cache($class_name);
+		$cache_key = self::_get_cache_key($class_name, $this->$primary_key) . '/' . $property . '/primary_key';
+		$method = null;
+		$do_cache = false;
 		$relationships = self::_get_static($class_name, '_relationships');
+		$relationship_type = null;
 
 		if (isset($relationships['belongs_to'][$property])) {
-			$instance = $this->_rel_belongs_to($property);
-			$this->_relationship_instances[$property] = $instance;
-			
-			if (!empty($field)) {
-				return ($instance != null) ? $instance->$field : null;
-			}
-			
-			return $instance;
+			$relationship_type = 'belongs_to';
+			$do_cache = true;
 		}
 		
 		if (isset($relationships['has_and_belongs_to_many'][$property])) {
-			if (!isset($this->$primary_key)) {
-				return array();
-			}
-			
-			$instances = $this->_rel_has_and_belongs_to_many($property);
-			$this->_relationship_instances[$property] = $instances;
-			return $instances;
+			$relationship_type = 'has_and_belongs_to_many';
 		}
 		
 		if (isset($relationships['has_many'][$property])) {
-			if (!isset($this->$primary_key)) {
-				return array();
-			}
-			
-			$instances = $this->_rel_has_many($property);
-			$this->_relationship_instances[$property] = $instances;
-			return $instances;
+			$relationship_type = 'has_many';
+			$do_cache = true;
 		}
 		
 		if (isset($relationships['has_one'][$property])) {
-			if (!isset($this->$primary_key)) {
-				return null;
-			}
-			
-			$instance = $this->_rel_has_one($property);
-			$this->_relationship_instances[$property] = $instance;
-			
-			if (!empty($field)) {
-				return ($instance != null) ? $instance->$field : null;
-			}
-			
-			return $instance;
+			$relationship_type = 'has_one';
+			$do_cache = true;
 		}
+		
+		if (empty($relationship_type)) {
+			return null;
+		}
+		
+		// disable this kind of caching for now until it's tested further
+		$do_cache = false;
+		
+		$relationship = $relationships[$relationship_type][$property];
+		$method = '_rel_' . $relationship_type;
+		
+		if (empty($instance) && $do_cache && $cache != null) {
+			$instance_id = $cache->get($cache_key);
+			$instance = call_user_func(array($relationship['class'], 'find'), $instance_id);
+		}
+			
+		if (empty($instance)) {
+			$instance = $this->$method($property);
+		}
+		
+		$this->_relationship_instances[$property] = $instance;
 
-		return null;
+		if ($do_cache && $cache != null) {
+			$expiration = self::_get_cache_expiration($class_name);
+			
+			if (is_array($instance)) {
+				$primary_keys = array();
+				
+				foreach ($instance as $instance_item) {
+					$primary_keys[] = $instance_item->__primary_key__;
+				}
+			} else {
+				$primary_keys = $instance ? $instance->__primary_key__ : '';
+			}
+			
+			$cache->set($cache_key, $primary_keys, null, $expiration);
+		}
+		
+		if (!empty($field)) {
+			return ($instance != null && !is_array($instance)) ? $instance->$field : null;
+		}
+		
+		return $instance;
 	}
 	
 	public function __toArray() {
@@ -1684,8 +1733,10 @@ class Paragon {
 		unset(self::$_object_cache[$class_name][$this->$primary_key]);
 		
 		// unset in shared cache
-		$cache_key = self::_get_cache_key($class_name, $this->$primary_key);
-		if ($cache != null) $cache->delete($cache_key);
+		if ($cache != null) {
+			$cache_key = self::_get_cache_key($class_name, $this->$primary_key);
+			$cache->delete($cache_key);
+		}
 	}
 	
 	public function validate() {

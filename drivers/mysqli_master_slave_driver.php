@@ -8,6 +8,9 @@ Released under the MIT License.
 class MysqliMasterSlaveDriver {
 	private $_master;
 	private $_slave;
+	
+	public $num_queries = 0;
+	public $time = 0;
 
 	// keys = [id], values = [[1, 2, 3]]
 	// => id in (1, 2, 3)
@@ -177,6 +180,20 @@ class MysqliMasterSlaveDriver {
 		return $predicate;
 	}
 	
+	private function _query($connection, $query) {
+		$this->num_queries++;
+		$start = microtime(true);
+		$result = $connection->query($query);
+		$end = microtime(true);
+		$this->time += $end - $start;
+		
+		if (!$result) {
+			throw new Exception($connection->error . "\r\n" . $query);
+		}
+		
+		return $result;
+	}
+	
 	private function _where_condition($table, $field, $val) {
 		$conditions = array();
 		
@@ -258,7 +275,8 @@ class MysqliMasterSlaveDriver {
 		foreach ($tables as $table => $fields) {
 			if ($fields['type'] == 'primary') {
 				$primary_table = $table;
-				$tables_string .= ' ' . $fields['table'] . ' AS ' . $table;
+				$tables_string .= ' ' . $fields['table'];
+				if ($table != $fields['table']) $tables_string .= ' AS ' . $table;
 				continue;
 			}
 			
@@ -266,7 +284,8 @@ class MysqliMasterSlaveDriver {
 				$primary_key = reset($keys);
 			}
 			
-			$part = 'LEFT JOIN ' . $fields['table'] . ' AS ' . $table;
+			$part = 'LEFT JOIN ' . $fields['table'];
+			if ($table != $fields['table']) $part .= ' AS ' . $table;
 			$this_table = !empty($fields['intermediary_table']) ? $fields['intermediary_table'] : $primary_table;
 			$part .= ' ON ' . $table . '.' . $fields['foreign_key'] . ' = ' . $this_table . '.' . $fields['primary_key'];
 			$tables_string .= ' ' . $part;
@@ -286,12 +305,7 @@ class MysqliMasterSlaveDriver {
 
 		// get the result
 		$query = "SELECT COUNT(*) AS count FROM (" . $query . ") AS subquery";
-		$result = $this->_slave->query($query);
-		
-		if (!$result) {
-			throw new Exception($this->_slave->error . "\r\n" . $query);
-		}
-
+		$result = $this->_query($this->_slave, $query);
 		$row = $result->fetch_assoc();
 		return !empty($row) ? (int) $row['count'] : 0;
 	}
@@ -305,12 +319,7 @@ class MysqliMasterSlaveDriver {
 		$table = $this->_master->real_escape_string($table);
 		$where_string = $this->_create_simple_where($this->_master, $keys, $key_values);
 		$query = 'DELETE FROM ' . $table . $where_string;
-		$result = $this->_master->query($query);
-		
-		if (!$result) {
-			throw new Exception($this->_master->error . "\r\n" . $query);
-		}
-		
+		$result = $this->_query($this->_master, $query);
 		return true;
 	}
 	
@@ -336,11 +345,13 @@ class MysqliMasterSlaveDriver {
 		foreach ($tables as $table => $fields) {
 			if ($fields['type'] == 'primary') {
 				$primary_table = $table;
-				$tables_string .= ' ' . $fields['table'] . ' AS ' . $table;
+				$tables_string .= ' ' . $fields['table'];
+				if ($table != $fields['table']) $tables_string .= ' AS ' . $table;
 				continue;
 			}
 			
-			$part = 'LEFT JOIN ' . $fields['table'] . ' AS ' . $table;
+			$part = 'LEFT JOIN ' . $fields['table'];
+			if ($table != $fields['table']) $part .= ' AS ' . $table;
 			$this_table = !empty($fields['intermediary_table']) ? $fields['intermediary_table'] : $primary_table;
 			$part .= ' ON ' . $table . '.' . $fields['foreign_key'] . ' = ' . $this_table . '.' . $fields['primary_key'];
 			$tables_string .= ' ' . $part;
@@ -348,12 +359,7 @@ class MysqliMasterSlaveDriver {
 		
 		$where_string = $this->_create_simple_where($this->_slave, $keys, $key_values);
 		$query = 'SELECT * FROM ' . $tables_string . ' ' . $where_string;
-		$result = $this->_slave->query($query);
-		
-		if (!$result) {
-			throw new Exception($this->_slave->error . "\r\n" . $query);
-		}
-		
+		$result = $this->_query($this->_slave, $query);
 		$rows = array();
 
 		while ($row = $result->fetch_assoc()) {
@@ -386,7 +392,8 @@ class MysqliMasterSlaveDriver {
 		foreach ($tables as $table => $fields) {
 			if ($fields['type'] == 'primary') {
 				$primary_table = $table;
-				$tables_string .= ' ' . $fields['table'] . ' AS ' . $table;
+				$tables_string .= ' ' . $fields['table'];
+				if ($table != $fields['table']) $tables_string .= ' AS ' . $table;
 				continue;
 			}
 			
@@ -394,7 +401,8 @@ class MysqliMasterSlaveDriver {
 				$primary_key = reset($keys);
 			}
 
-			$part = 'LEFT JOIN ' . $fields['table'] . ' AS ' . $table;
+			$part = 'LEFT JOIN ' . $fields['table'];
+			if ($table != $fields['table']) $part .= ' AS ' . $table;
 			$this_table = !empty($fields['intermediary_table']) ? $fields['intermediary_table'] : $primary_table;
 			$part .= ' ON ' . $table . '.' . $fields['foreign_key'] . ' = ' . $this_table . '.' . $fields['primary_key'];
 			$tables_string .= ' ' . $part;
@@ -433,11 +441,7 @@ class MysqliMasterSlaveDriver {
 		}
 		
 		// get the result
-		$result = $this->_slave->query($query);
-		
-		if (!$result) {
-			throw new Exception($this->_slave->error . "\r\n" . $query);
-		}
+		$result = $this->_query($this->_slave, $query);
 		
 		// return primary_keys
 		$primary_keys = array();
@@ -485,11 +489,7 @@ class MysqliMasterSlaveDriver {
 				   . ' (' . $fields_string . ')'
 				   . ' VALUES'
 				   . ' (' . $values_string . ')';
-			$result = $this->_master->query($query);
-			
-			if (!$result) {
-				throw new Exception($this->_master->error . "\r\n" . $query);
-			}
+			$result = $this->_query($this->_master, $query);
 			
 			if (count($keys) == 1 && empty($changes[$keys[0]])) {
 				return $this->_master->insert_id;
@@ -521,12 +521,7 @@ class MysqliMasterSlaveDriver {
 		$query = ' UPDATE ' . $table
 			   . ' SET ' . $set_string
 			   .   $where_string;
-		$result = $this->_master->query($query);
-		
-		if (!$result) {
-			throw new Exception($this->_master->error . "\r\n" . $query);
-		}
-		
+		$result = $this->_query($this->_master, $query);
 		return true;
 	}
 }
