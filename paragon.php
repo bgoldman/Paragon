@@ -1445,13 +1445,12 @@ class Paragon {
 		}
 		
 		if (empty($type) || empty($relationship)) {
-			return;
+			return false;
 		}
 
 		if ($type == 'belongs_to') {
 			$this->{$relationship['foreign_key']} = $instance->__primary_key__;
-			$this->save();
-			return;
+			return $this->save();
 		}
 
 		if ($type == 'has_and_belongs_to_many') {
@@ -1462,28 +1461,29 @@ class Paragon {
 			));
 
 			if (!empty($existing_relationship)) {
-				return;
+				return true;
 			}
 		
 			$data = array(
 				$relationship['primary_key'] => $this->__primary_key__,
 				$relationship['foreign_key'] => $instance->__primary_key__,
 			);
-			$connection->save(null, $relationship['table'], $data, null);
-			return;
+			return $connection->save(null, $relationship['table'], $data, null);
 		}
 		
 		if ($type == 'has_many') {
 			$relationship['type'] = 'belongs_to';
-			$instance->add_relationship($relationship, $this);
-			return;
+			$relationship['foreign_key'] = $relationship['primary_key'];
+			return $instance->add_relationship($relationship, $this);
 		}
 		
 		if ($type == 'has_one') {
 			$relationship['type'] = 'belongs_to';
-			$instance->add_relationship($relationship, $this);
-			return;
+			$relationship['foreign_key'] = $relationship['primary_key'];
+			return $instance->add_relationship($relationship, $this);
 		}
+		
+		return false;
 	}
 	
 	public function remove_relationship($property, $instance) {
@@ -1507,19 +1507,18 @@ class Paragon {
 		}
 		
 		if (empty($type) || empty($relationship)) {
-			return;
+			return false;
 		}
 
 		if ($type == 'belongs_to') {
 			$this->{$relationship['foreign_key']} = null;
-			$this->save();
-			return;
+			return $this->save();
 		}
 
 		if ($type == 'has_and_belongs_to_many') {
 			$primary_keys = array($relationship['primary_key'], $relationship['foreign_key']);
 			$table = $relationship['table'];
-			$connection->delete_by_primary_keys(
+			return $connection->delete_by_primary_keys(
 				$primary_keys, $table,
 				array(
 					array(
@@ -1528,19 +1527,18 @@ class Paragon {
 					)
 				)
 			);
-			return;
 		}
 		
 		if ($type == 'has_many') {
 			$relationship['type'] = 'belongs_to';
-			$instance->remove_relationship($relationship, $this);
-			return;
+			$relationship['foreign_key'] = $relationship['primary_key'];
+			return $instance->remove_relationship($relationship, $this);
 		}
 		
 		if ($type == 'has_one') {
 			$relationship['type'] = 'belongs_to';
-			$instance->remove_relationship($relationship, $this);
-			return;
+			$relationship['foreign_key'] = $relationship['primary_key'];
+			return $instance->remove_relationship($relationship, $this);
 		}
 	}
 	
