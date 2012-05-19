@@ -512,11 +512,14 @@ class Paragon {
 
 				if (!isset($info['primary_key_field'])) $info['primary_key_field'] = $primary_key;
 				if (!isset($info['foreign_key_field'])) $info['foreign_key_field'] = '__primary_key__';
-
-				if (!isset($info['table'])) {
+				
+				if (!empty($info['class'])) {
 					self::_require_model($info['class']);
 					self::_init($info['class']);
-					$info['table'] = self::_get_static($info['class'], '_table');
+
+					if (!isset($info['table'])) {
+						$info['table'] = self::_get_static($info['class'], '_table');
+					}
 				}
 				
 				$relationships[$relationship_type][$property] = array(
