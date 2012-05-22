@@ -677,15 +677,12 @@ class Paragon {
 						$prefix2 = $relationship . '.';
 					
 						if (
-							(
+							!in_array($key, $fields)
+							&& (
 								strpos($key, $prefix1) === 0
-								&& !in_array($key, $fields)
-							) || strpos($key, $prefix2) === 0
+								|| strpos($key, $prefix2) === 0
+							)
 						) {
-							if (in_array($key, $fields)) {
-								continue;
-							}
-						
 							if (empty($found_relationships[$relationship])) {
 								$found_relationships[$relationship] = array(
 									'conditions' => array(),
