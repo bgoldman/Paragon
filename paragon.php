@@ -669,9 +669,27 @@ class Paragon {
 			}
 
 			$found_relationships = array();
-		
+
+			// sort $relationship_data by reverse string length.
+			// this prevents shorter relationship keys
+			// that are subsets of longer relationship keys
+			// from causing a bug when finding relationships below
+			$relationship_keys = array_keys($relationship_data);
+			$sorted_relationship_keys = array_combine($relationship_keys, array_map('strlen', $relationship_keys));
+			arsort($sorted_relationship_keys);
+			$sorted_relationships = array();
+			
+			foreach ($sorted_relationship_keys as $relationship => $strlen) {
+				$sorted_relationships[$relationship] = $relationship_data[$relationship];
+			}
+			
+			$relationship_data = $sorted_relationships;
+			$corrected_relationships = array();
+
 			foreach ($relationship_data as $relationship => $data) {
 				if (!empty($params['conditions'])) {
+					$corrected_keys = array();
+					
 					foreach ($params['conditions'] as $key => $val) {
 						$prefix1 = $relationship . '_';
 						$prefix2 = $relationship . '.';
@@ -683,6 +701,17 @@ class Paragon {
 								|| strpos($key, $prefix2) === 0
 							)
 						) {
+							if (
+								isset($corrected_relationships[$key])
+								&& $corrected_relationships[$key] != $relationships
+							) {
+								continue;
+							}
+							
+							if (strpos($key, $prefix1) == 0) {
+								$corrected_relationships[$key] = $relationship;
+							}
+							
 							if (empty($found_relationships[$relationship])) {
 								$found_relationships[$relationship] = array(
 									'conditions' => array(),
