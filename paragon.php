@@ -125,7 +125,7 @@ class Paragon {
 		$params = self::_single_relationship_params($info, $params);
 		
 		if ($scalar) {
-			if (!in_array($params, $ids)) {
+			if (!in_array($params['conditions']['__primary_key__'], $ids)) {
 				if ($method == 'count') {
 					return 0;
 				}
@@ -1343,10 +1343,6 @@ class Paragon {
 	public function __get($property) {
 		$class_name = get_class($this);
 		$primary_key = self::_get_static($class_name, '_primary_key');
-		
-		if (!isset($this->$primary_key)) {
-			return null;
-		}
 
 		if ($property === '__primary_key__') {
 			return $this->$primary_key;
@@ -1396,6 +1392,13 @@ class Paragon {
 			return null;
 		}
 		
+		if (
+			$relationship_type != 'belongs_to'
+			&& !isset($this->$primary_key)
+		) {
+			return null;
+		}
+		
 		// disable this kind of caching for now until it's tested further
 		$do_cache = false;
 		
@@ -1406,7 +1409,7 @@ class Paragon {
 			$instance_id = $cache->get($cache_key);
 			$instance = call_user_func(array($relationship['class'], 'find'), $instance_id);
 		}
-			
+
 		if (empty($instance)) {
 			$instance = $this->$method($property);
 		}
