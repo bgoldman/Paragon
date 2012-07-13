@@ -453,6 +453,10 @@ class Paragon {
 				continue;
 			}
 			
+			if ($property->name == 'errors') {
+				continue;
+			}
+			
 			$fields[] = $property->getName();
 		}
 		
