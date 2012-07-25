@@ -1,7 +1,7 @@
 <?php
 /*
 paragon.php
-Copyright (c) 2011 Brandon Goldman
+Copyright (c) 2012 Brandon Goldman
 Released under the MIT License.
 */
 
