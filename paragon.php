@@ -679,7 +679,12 @@ class Paragon {
 			// that are subsets of longer relationship keys
 			// from causing a bug when finding relationships below
 			$relationship_keys = array_keys($relationship_data);
-			$sorted_relationship_keys = array_combine($relationship_keys, array_map('strlen', $relationship_keys));
+			$sorted_relationship_keys = array();
+			
+			if (!empty($relationship_keys)) {
+				$sorted_relationship_keys = array_combine($relationship_keys, array_map('strlen', $relationship_keys));
+			}
+			
 			arsort($sorted_relationship_keys);
 			$sorted_relationships = array();
 			
