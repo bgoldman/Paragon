@@ -744,11 +744,23 @@ class Paragon {
 						}
 					
 						if (
-							(
+							!in_array($order, $fields)
+							&& (
 								strpos($order, $prefix1) === 0
-								&& !in_array($order, $fields)
-							) || strpos($order, $prefix2) === 0
+								|| strpos($order, $prefix2) === 0
+							)
 						) {
+							if (
+								isset($corrected_relationships[$order])
+								&& $corrected_relationships[$order] != $relationships
+							) {
+								continue;
+							}
+							
+							if (strpos($order, $prefix1) == 0) {
+								$corrected_relationships[$order] = $relationship;
+							}
+							
 							if (empty($found_relationships[$relationship])) {
 								$found_relationships[$relationship] = array(
 									'conditions' => array(),
@@ -820,7 +832,44 @@ class Paragon {
 					
 					$field = substr($order_field, strlen($relationship_key) + 1);
 					$field = self::_alias($relationship['class'], $field);
-					$order_parts[$key] = $relationship_key . '.' . $field . $suffix;
+					
+					if ($relationship['type'] == 'has_and_belongs_to_many') {
+						self::_init($relationship['class']);
+						$other_table = self::_get_static($relationship['class'], '_table');
+						$other_primary_key = self::_get_static($relationship['class'], '_primary_key');
+						$real_key = self::_alias($relationship['class'], $field);
+						$field = $real_key;
+					}
+					
+					if (strpos($field, '.')) {
+						list($these_tables, $these_params) = self::_relationship_params($relationship['class'], array(
+							'order' => $field,
+						));
+						
+						$these_order_parts = explode(', ', $these_params['order']);
+						
+						foreach ($these_order_parts as $order_key => $order_value) {
+							$order_parts[$order_key] = $order_value . $suffix;
+						}
+						
+						foreach ($these_tables as $this_table => $table_info) {
+							if ($table_info['type'] == 'primary') {
+								continue;
+							}
+							
+							if (!empty($extra_tables[$this_table])) {
+								continue;
+							}
+
+							if (empty($table_info['intermediary_table'])) {
+								$table_info['intermediary_table'] = $relationship_key;
+							}
+							
+							$extra_tables[$this_table] = $table_info;
+						}
+					} else {
+						$order_parts[$key] = $relationship_key . '.' . $field . $suffix;
+					}
 				}
 
 				$primary_key = self::_get_static($relationship['class'], '_primary_key');
@@ -1405,7 +1454,7 @@ class Paragon {
 			$relationship_type != 'belongs_to'
 			&& !isset($this->$primary_key)
 		) {
-			return null;
+			return ($relationship_type == 'has_one') ? null : array();
 		}
 		
 		// disable this kind of caching for now until it's tested further
