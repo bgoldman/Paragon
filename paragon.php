@@ -1157,7 +1157,11 @@ class Paragon {
 			) {
 				$instance = call_user_func(array($class_name, 'find'), $params['conditions'][$primary_key]);
 
-				if ($return_array && !empty($instance)) {
+				if ($return_array) {
+					if (empty($instance)) {
+						return array();
+					}
+					
 					return array($instance);
 				}
 				
