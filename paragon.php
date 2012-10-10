@@ -1341,13 +1341,17 @@ class Paragon {
 		// reset runtime cache
 		if ($class_name == 'Paragon') {
 			foreach (self::$_object_cache as $class => $cache) {
-				self::$_object_cache[$class] = array();
+				$class::uncache_all();
 			}
 
 			return;
 		}
 
 		// reset in runtime cache for this class only
+		foreach (self::$_object_cache[$class_name] as $key => $object) {
+			$object->uncache();
+		}
+		
 		self::$_object_cache[$class_name] = array();
 	}
 	
@@ -1823,6 +1827,9 @@ class Paragon {
 		
 		// unset in runtime cache
 		unset(self::$_object_cache[$class_name][$this->$primary_key]);
+		
+		// unset relationships cache
+		$this->_relationship_instances = array();
 		
 		// unset in shared cache
 		if ($cache != null) {
