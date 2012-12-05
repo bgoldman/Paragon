@@ -856,7 +856,7 @@ class Paragon {
 							$extra_tables[$this_table] = $table_info;
 						}
 					} else {
-						$order = $relationship_key . '.' . $field . $suffix;
+						$order = $relationship_key . '.' . $field;
 						if ($reverse_order) $order = '-' . $order;
 						$order_parts[$key] = $order;
 					}
