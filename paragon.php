@@ -592,15 +592,6 @@ class Paragon {
 		$return_order_parts = array();
 
 		foreach ($orders as $key => $order) {
-			$order_parts = explode(' ', trim($order), 2);
-			$order = trim($order_parts[0]);
-			
-			if (!empty($order_parts[1])) {
-				$modifier = strtolower(trim($order_parts[1]));
-			} else {
-				$modifier = '';
-			}
-			
 			$reverse_order = false;
 			
 			if (substr($order, 0, 1) == '-') {
@@ -626,25 +617,18 @@ class Paragon {
 				}
 			}
 
-			if ($internal) {
-				if (!empty($aliases[$order])) {
-					$order = $aliases[$order];
-				}
-			}
-			
-			if ($modifier == 'desc') {
-				$reverse_order = true;
+			if ($internal && !empty($aliases[$order])) {
+				$order = $aliases[$order];
 			}
 			
 			if (!empty($reverse_order)) {
-				$order .= ' DESC';
+				$order = '-' . $order;
 			}
 			
 			$return_order_parts[] = $order;
 		}
 		
-		$return_order = implode(', ', $return_order_parts);
-		return $return_order;
+		return implode(',', $return_order_parts);
 	}
 	
 	private static function _relationship_params($class_name, $params) {
@@ -658,7 +642,7 @@ class Paragon {
 		$fields = self::_get_static($class_name, '_fields');
 		
 		if (!empty($params['order'])) {
-			$order_parts = explode(', ', $params['order']);
+			$order_parts = explode(',', $params['order']);
 		}
 		
 		if (!empty($params['conditions']) || !empty($params['order'])) {
@@ -712,7 +696,7 @@ class Paragon {
 						) {
 							if (
 								isset($corrected_relationships[$key])
-								&& $corrected_relationships[$key] != $relationships
+								&& $corrected_relationships[$key] != $relationship
 							) {
 								continue;
 							}
@@ -735,24 +719,25 @@ class Paragon {
 				
 				if (!empty($params['order'])) {
 					foreach ($order_parts as $key => $order) {
+						$order = trim($order);
 						$prefix1 = $relationship . '_';
 						$prefix2 = $relationship . '.';
 						$order_field = $order;
 						
-						if (strpos($order, ' ')) {
-							$order_field = substr($order, 0, strpos($order, ' '));
+						if (substr($order, 0, 1) == '-') {
+							$order_field = substr($order, 1);
 						}
 					
 						if (
-							!in_array($order, $fields)
+							!in_array($order_field, $fields)
 							&& (
-								strpos($order, $prefix1) === 0
-								|| strpos($order, $prefix2) === 0
+								strpos($order_field, $prefix1) === 0
+								|| strpos($order_field, $prefix2) === 0
 							)
 						) {
 							if (
-								isset($corrected_relationships[$order])
-								&& $corrected_relationships[$order] != $relationships
+								isset($corrected_relationships[$order_field])
+								&& $corrected_relationships[$order_field] != $relationship
 							) {
 								continue;
 							}
@@ -822,12 +807,13 @@ class Paragon {
 				}
 				
 				foreach ($matches['order'] as $key => $order) {
+					$order = trim($order);
 					$order_field = $order;
-					$suffix = '';
+					$reverse_order = false;
 					
-					if (strpos($order, ' ')) {
-						$order_field = substr($order, 0, strpos($order, ' '));
-						$suffix = substr($order, strpos($order, ' '));
+					if (substr($order, 0, 1) == '-') {
+						$order_field = substr($order, 0, 1);
+						$reverse_order = true;
 					}
 					
 					$field = substr($order_field, strlen($relationship_key) + 1);
@@ -846,10 +832,12 @@ class Paragon {
 							'order' => $field,
 						));
 						
-						$these_order_parts = explode(', ', $these_params['order']);
+						$these_order_parts = explode(',', $these_params['order']);
 						
 						foreach ($these_order_parts as $order_key => $order_value) {
-							$order_parts[$order_key] = $order_value . $suffix;
+							$this_order = trim($order_value);
+							if ($reverse_order) $this_order = '-' . $this_order;
+							$order_parts[$order_key] = $this_order;
 						}
 						
 						foreach ($these_tables as $this_table => $table_info) {
@@ -868,7 +856,9 @@ class Paragon {
 							$extra_tables[$this_table] = $table_info;
 						}
 					} else {
-						$order_parts[$key] = $relationship_key . '.' . $field . $suffix;
+						$order = $relationship_key . '.' . $field . $suffix;
+						if ($reverse_order) $order = '-' . $order;
+						$order_parts[$key] = $order;
 					}
 				}
 
@@ -942,12 +932,25 @@ class Paragon {
 		
 		if (!empty($order_parts)) {
 			foreach ($order_parts as $key => $order) {
-				if (!strpos($order, '.')) {
-					$order_parts[$key] = $table . '_primary.' . $order;
+				$order = trim($order);
+				
+				if (strpos($order, '.') !== false) {
+					continue;
 				}
+				
+				$reverse_order = false;
+				
+				if (substr($order, 0, 1) == '-') {
+					$order = substr($order, 1);
+					$reverse_order = true;
+				}
+				
+				$order = $table . '_primary.' . $order;
+				if ($reverse_order) $order = '-' . $order;
+				$order_parts[$key] = $order;
 			}
 			
-			$params['order'] = implode(', ', $order_parts);
+			$params['order'] = implode(',', $order_parts);
 		}
 
 		return array($tables, $params);

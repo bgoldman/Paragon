@@ -144,6 +144,19 @@ class MysqliMasterSlaveDriver {
 		$where_string = ' WHERE (' . implode(') OR (', $wheres) . ')';
 		return $where_string;
 	}
+	
+	private function _order($order) {
+		$orders = explode(',', $order);
+
+		foreach ($orders as $key => $order) {
+			if (substr($order, 0, 1) == '-') {
+				$orders[$key] = substr($order, 1) . ' DESC';
+			}
+		}
+		
+		$order = implode(',', $orders);
+		return $this->_slave->real_escape_string($order);
+	}
 
 	private function _paragon_condition($val) {
 		if ($val->type == 'gt') {
@@ -422,10 +435,10 @@ class MysqliMasterSlaveDriver {
 			$query .= ' GROUP BY ' . $primary_table . '.' . $primary_key . ' ';
 		}
 
-		// add order by if necessary
+		// add order if necessary
 		if (!empty($params['order'])) {
-			$order_by = $this->_slave->real_escape_string($params['order']);
-			$query .= ' ORDER BY ' . $order_by;
+			$order = $this->_order($params['order']);
+			$query .= ' ORDER BY ' . $order;
 		}
 
 		// add a limit if necessary
