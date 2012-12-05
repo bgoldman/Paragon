@@ -640,10 +640,7 @@ class Paragon {
 		);
 		$extra_tables = array();
 		$fields = self::_get_static($class_name, '_fields');
-		
-		if (!empty($params['order'])) {
-			$order_parts = explode(',', $params['order']);
-		}
+		$order_parts = !empty($params['order']) ? explode(',', $params['order']) : array();
 		
 		if (!empty($params['conditions']) || !empty($params['order'])) {
 			$relationships = self::_get_static($class_name, '_relationships');
@@ -812,7 +809,7 @@ class Paragon {
 					$reverse_order = false;
 					
 					if (substr($order, 0, 1) == '-') {
-						$order_field = substr($order, 0, 1);
+						$order_field = substr($order, 1);
 						$reverse_order = true;
 					}
 					
