@@ -592,6 +592,7 @@ class Paragon {
 		$return_order_parts = array();
 
 		foreach ($orders as $key => $order) {
+			$order = trim($order);
 			$reverse_order = false;
 			
 			if (substr($order, 0, 1) == '-') {
@@ -616,7 +617,7 @@ class Paragon {
 					continue;
 				}
 			}
-
+			
 			if ($internal && !empty($aliases[$order])) {
 				$order = $aliases[$order];
 			}
