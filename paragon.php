@@ -298,6 +298,7 @@ class Paragon {
 		$primary_key = self::_get_static($class_name, '_primary_key');
 		$aliases = self::_get_static($class_name, '_aliases');
 		$real_primary_key = !empty($aliases[$primary_key]) ? $aliases[$primary_key] : $primary_key;
+		$validations = self::_get_static($class_name, 'validations');
 
 		$table = self::_get_static($class_name, '_table');
 		$cache = self::_get_cache($class_name);
@@ -348,7 +349,34 @@ class Paragon {
 			$rows[] = $row;
 		}
 
-		return array_merge($data_items, $rows);
+		$data_items = array_merge($data_items, $rows);
+		
+		foreach ($data_items as $key => $row) {
+			foreach ($row as $field => $value) {
+				if (
+					$field == 'date_created'
+					|| $field == 'date_updated'
+					|| (
+						!empty($validations[$field])
+						&& (
+							!empty($validations[$field]['date'])
+							|| !empty($validations[$field]['datetime'])
+							|| !empty($validations[$field]['timestamp'])
+						)
+					)
+				) {
+					$time = strtotime($value) + date('Z');
+				
+					if (!empty($validations[$field]['timestamp'])) {
+						$data_items[$key][$field] = $time;
+					} else {
+						$data_items[$key][$field] = date('Y-m-d H:i:s', $time);
+					}
+				}
+			}
+		}
+		
+		return $data_items;
 	}
 	
 	private static function _get_instances($class_name, $ids, $index = null) {
@@ -1734,6 +1762,29 @@ class Paragon {
 			}
 			
 			$changes[$real_field] = $this->$field;
+		}
+		
+		foreach ($changes as $field => $value) {
+			if (
+				$field == 'date_created'
+				|| $field == 'date_updated'
+				|| (
+					!empty($validations[$field])
+					&& (
+						!empty($validations[$field]['date'])
+						|| !empty($validations[$field]['datetime'])
+						|| !empty($validations[$field]['timestamp'])
+					)
+				)
+			) {
+				$time = strtotime($value);
+				
+				if (!empty($validations[$field]['timestamp'])) {
+					$changes[$field] = $time;
+				} else {
+					$changes[$field] = gmdate('Y-m-d H:i:s', $time);
+				}
+			}
 		}
 		
 		$real_primary_key = !empty($aliases[$primary_key]) ? $aliases[$primary_key] : $primary_key;
