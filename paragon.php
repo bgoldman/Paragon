@@ -352,28 +352,7 @@ class Paragon {
 		$data_items = array_merge($data_items, $rows);
 		
 		foreach ($data_items as $key => $row) {
-			foreach ($row as $field => $value) {
-				if (
-					$field == 'date_created'
-					|| $field == 'date_updated'
-					|| (
-						!empty($validations[$field])
-						&& (
-							!empty($validations[$field]['date'])
-							|| !empty($validations[$field]['datetime'])
-							|| !empty($validations[$field]['timestamp'])
-						)
-					)
-				) {
-					$time = strtotime($value) + date('Z');
-				
-					if (!empty($validations[$field]['timestamp'])) {
-						$data_items[$key][$field] = $time;
-					} else {
-						$data_items[$key][$field] = date('Y-m-d H:i:s', $time);
-					}
-				}
-			}
+			$data_items[$key] = self::_localize_dates($class_name, $row, $to_gmt = false);
 		}
 		
 		return $data_items;
@@ -592,6 +571,69 @@ class Paragon {
 				throw new Exception('Class \''. $class_name . '\' is missing a datastore connection.');
 			}
 		}
+	}
+	
+	private static function _localize_date($class_name, $field, $value, $to_gmt) {
+		$validations = self::_get_static($class_name, 'validations');
+		
+		if ($value instanceof ParagonCondition) {
+			$value = clone $value;
+			$value->value = self::_localize_date($class_name, $field, $value->value, $to_gmt);
+			return $value;
+		}
+		
+		if (
+			!empty($value)
+			&& (
+				$field == 'date_created'
+				|| $field == 'date_updated'
+				|| (
+					!empty($validations[$field])
+					&& (
+						!empty($validations[$field]['date'])
+						|| !empty($validations[$field]['datetime'])
+					)
+				)
+			)
+		) {
+			if ($to_gmt) {
+				$value = gmdate('Y-m-d H:i:s', strtotime($value));
+			} else {
+				$value = date('Y-m-d H:i:s', strtotime($value) + date('Z'));
+			}
+		} elseif (
+			!empty($value)
+			&& !empty($validations[$field])
+			&& !empty($validations[$field]['timestamp'])
+		) {
+			if ($to_gmt) {
+				$value -= date('Z');
+			} else {
+				$value += date('Z');
+			}
+		}
+		
+		return $value;
+	}
+	
+	private static function _localize_dates($class_name, $params, $to_gmt = false) {
+		foreach ($params as $field => $value) {
+			if (is_array($value)) {
+				foreach ($value as $k => $v) {
+					if (is_numeric($k)) {
+						$params[$field][$k] = self::_localize_date($class_name, $field, $v, $to_gmt);
+					} else {
+						$params[$field][$k] = self::_localize_date($class_name, $k, $v, $to_gmt);
+					}
+				}
+				
+				continue;
+			}
+			
+			$params[$field] = self::_localize_date($class_name, $field, $value, $to_gmt);
+		}
+		
+		return $params;
 	}
 	
 	private static function _new_instance($class_name, $data) {
@@ -1097,10 +1139,19 @@ class Paragon {
 
 		list($tables, $params) = self::_relationship_params($class_name, $params);
 		$primary_key = self::_alias($class_name, $primary_key);
+		
+		if (!empty($params['conditions'])) {
+			$params['conditions'] = self::_localize_dates($class_name, $params['conditions'], $to_gmt = true);
+		}
+		
 		return $connection->count($primary_key, $tables, $params);
 	}
 	
 	public static function find($params) {
+		// init the class
+		$class_name = get_called_class();
+		self::_init($class_name);
+		
 		// if we have no params,
 		// or if limit is set to 0
 		// return an empty array for an empty array input, or null for anything other input
@@ -1114,9 +1165,6 @@ class Paragon {
 			return is_array($params) ? array() : null;
 		}
 		
-		// set some userful variables
-		$class_name = get_called_class();
-		self::_init($class_name);
 		$primary_key = self::_get_static($class_name, '_primary_key');
 
 		// if we a scalar value, it's probably an id,
@@ -1274,6 +1322,11 @@ class Paragon {
 		$primary_keys = array();
 		$real_primary_key = !empty($aliases[$primary_key]) ? $aliases[$primary_key] : $primary_key;
 		list($tables, $params) = self::_relationship_params($class_name, $params);
+
+		if (!empty($params['conditions'])) {
+			$params['conditions'] = self::_localize_dates($class_name, $params['conditions'], $to_gmt = true);
+		}
+
 		$results = $connection->find_primary_keys($real_primary_key, $tables, $params);
 		
 		foreach ($results as $key => $val) {
@@ -1764,29 +1817,7 @@ class Paragon {
 			$changes[$real_field] = $this->$field;
 		}
 		
-		foreach ($changes as $field => $value) {
-			if (
-				$field == 'date_created'
-				|| $field == 'date_updated'
-				|| (
-					!empty($validations[$field])
-					&& (
-						!empty($validations[$field]['date'])
-						|| !empty($validations[$field]['datetime'])
-						|| !empty($validations[$field]['timestamp'])
-					)
-				)
-			) {
-				$time = strtotime($value);
-				
-				if (!empty($validations[$field]['timestamp'])) {
-					$changes[$field] = $time;
-				} else {
-					$changes[$field] = gmdate('Y-m-d H:i:s', $time);
-				}
-			}
-		}
-		
+		$changes = self::_localize_dates($class_name, $changes, $to_gmt = true);
 		$real_primary_key = !empty($aliases[$primary_key]) ? $aliases[$primary_key] : $primary_key;
 
 		if (!$this->_is_created) {
