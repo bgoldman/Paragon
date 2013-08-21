@@ -618,9 +618,13 @@ class Paragon {
 	
 	private static function _localize_dates($class_name, $params, $to_gmt = false) {
 		foreach ($params as $field => $value) {
+			if (is_int($field) && is_scalar($value)) {
+				continue;
+			}
+			
 			if (is_array($value)) {
 				foreach ($value as $k => $v) {
-					if (is_numeric($k)) {
+					if (is_int($k)) {
 						$params[$field][$k] = self::_localize_date($class_name, $field, $v, $to_gmt);
 					} else {
 						$params[$field][$k] = self::_localize_date($class_name, $k, $v, $to_gmt);
