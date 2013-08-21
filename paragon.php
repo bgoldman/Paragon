@@ -1243,6 +1243,12 @@ class Paragon {
 						return array();
 					}
 					
+					if (!empty($params['index'])) {
+						return array(
+							$instance->$params['index'] => $instance,
+						);
+					}
+					
 					return array($instance);
 				}
 				
