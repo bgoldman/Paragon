@@ -43,6 +43,9 @@ class Paragon {
 	protected static $_cache_expiration;
 	protected static $_connection;
 	
+	// the timezone in which dates are stored in the database
+	protected static $_timezone = 'UTC';
+	
 	public static $validations;
 
 	
@@ -440,6 +443,16 @@ class Paragon {
 		return self::$_static_variables[$class][$variable];
 	}
 	
+	private static function _get_timezone($class_name) {
+		$timezone = self::_get_static($class_name, '_timezone');
+		
+		if (!empty($timezone)) {
+			return $timezone;
+		}
+		
+		return self::$_timezone;
+	}
+	
 	private static function _init($class_name) {
 		$is_init = self::_get_static($class_name, '_is_init');
 		
@@ -582,6 +595,10 @@ class Paragon {
 			return $value;
 		}
 		
+		$timezone = new DateTimeZone(self::_get_timezone($class_name));
+		$gmt_now = new DateTime('now');
+		$timezone_offset = $timezone->getOffset($gmt_now);
+		
 		if (
 			!empty($value)
 			&& (
@@ -597,9 +614,9 @@ class Paragon {
 			)
 		) {
 			if ($to_gmt) {
-				$value = gmdate('Y-m-d H:i:s', strtotime($value));
+				$value = gmdate('Y-m-d H:i:s', strtotime($value) + $timezone_offset);
 			} else {
-				$value = date('Y-m-d H:i:s', strtotime($value) + date('Z'));
+				$value = date('Y-m-d H:i:s', strtotime($value) + date('Z') - $timezone_offset);
 			}
 		} elseif (
 			!empty($value)
@@ -607,9 +624,9 @@ class Paragon {
 			&& !empty($validations[$field]['timestamp'])
 		) {
 			if ($to_gmt) {
-				$value -= date('Z');
+				$value -= date('Z') - $timezone_offset;
 			} else {
-				$value += date('Z');
+				$value += date('Z') - $timezone_offset;
 			}
 		}
 		
@@ -1351,6 +1368,16 @@ class Paragon {
 		return self::_get_cache($class_name);
 	}
 	
+	public static function get_connection() {
+		$class_name = get_called_class();
+		return self::_get_connection($class_name);
+	}
+	
+	public static function get_timezone() {
+		$class_name = get_called_class();
+		return self::_get_timezone($class_name);
+	}
+	
 	public static function order($order) {
 		return self::_order($order, false);
 	}
@@ -1398,11 +1425,6 @@ class Paragon {
 		return array($data, $pagination);
 	}
 	
-	public static function get_connection() {
-		$class_name = get_called_class();
-		return self::_get_connection($class_name);
-	}
-	
 	public static function set_cache($cache, $cache_expiration = null) {
 		$class_name = get_called_class();
 		
@@ -1425,6 +1447,17 @@ class Paragon {
 		}
 		
 		self::_set_static($class_name, '_connection', $connection);
+	}
+	
+	public static function set_timezone($timezone) {
+		$class_name = get_called_class();
+		
+		if ($class_name == 'Paragon') {
+			self::$_timezone = $timezone;
+			return;
+		}
+		
+		self::_set_static($class_name, '_timezone', $timezone);
 	}
 	
 	public static function uncache_all() {
