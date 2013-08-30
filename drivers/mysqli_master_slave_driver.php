@@ -30,28 +30,62 @@ class MysqliMasterSlaveDriver {
 	}
 	
 	private function _create_complex_where($conn, $table, $params) {
-		// set the conditions
-		if (!isset($params['conditions']) || !is_array($params['conditions'])) $params['conditions'] = array();
-		$conditions = array();
-
-		foreach ($params['conditions'] as $field => $val) {
+		if (empty($params['conditions'])) {
+			return '';
+		}
+	
+		$conditions = $this->_create_complex_where_part($conn, $table, $params['conditions']);
+		
+		if (empty($conditions)) {
+			return '';
+		}
+		
+		return ' WHERE ' . implode(' AND ', $conditions);
+	}
+	
+	private function _create_complex_where_part($conn, $table, $conditions) {
+		$sql_conditions = array();
+		
+		foreach ($conditions as $field => $val) {
 			// if we have an empty array, it means this query is requesting "IN ('')" which never returns anything,
 			// so just return early with no results
 			if (is_array($val) && count($val) == 0) {
 				return false;
 			}
-
+			
+			// if we have an empty operator, it means this query will never returns anything,
+			// so just return early with no results
+			if ($val instanceof ParagonOperator && count($val->value) == 0) {
+				return false;
+			}
+			
 			if (!is_int($field)) {
 				$these_conditions = $this->_where_condition($table, $field, $val);
 				
 				foreach ($these_conditions as $condition) {
-					$conditions[] = $condition;
+					$sql_conditions[] = $condition;
 				}
 				
 				continue;
 			}
 			
 			if (is_array($val)) {
+				$val = Paragon::operator('or', $val);
+			}
+			
+			if ($val instanceof ParagonOperator) {
+				$val_conditions = $this->_create_complex_where_part($conn, $table, $val->value);
+				
+				if (count($val_conditions) == 1) {
+					$sql_conditions[] = $val_conditions[0];
+					continue;
+				}
+				
+				$sql_conditions[] = '(' . implode(' ' . strtoupper($val->type) . ' ', $val_conditions) . ')';
+				continue;
+			}
+			
+			if (!empty($val) && $val[0] instanceof ParagonCondition) {
 				$val_conditions = array();
 				
 				foreach ($val as $k => $v) {
@@ -62,21 +96,23 @@ class MysqliMasterSlaveDriver {
 					}
 				}
 				
-				$conditions[] = '(' . implode(' OR ', $val_conditions) . ')';
+				if (count($val_conditions) == 1) {
+					$sql_conditions = $val_conditions[0];
+					continue;
+				}
+				
+				$sql_conditions[] = '(' . implode(' OR ', $val_conditions) . ')';
 				continue;
 			}
 
-			if (strlen($val) > 0) $conditions[] = $val;
-		}
-
-		if (!empty($conditions)) {
-			$conditions_string = implode(' AND ', $conditions);
-		} else {
-			$conditions_string = 1;
+			if (strlen($val) > 0) $sql_conditions[] = $val;
 		}
 		
-		$query = ' WHERE ' . $conditions_string;
-		return $query;
+		if (empty($sql_conditions)) {
+			return false;
+		}
+
+		return $sql_conditions;
 	}
 	
 	private function _create_simple_where($conn, $keys, $key_values) {
@@ -165,6 +201,8 @@ class MysqliMasterSlaveDriver {
 			$predicate = '>= \'' . $this->_slave->real_escape_string($val->value) . '\'';
 		} elseif ($val->type == 'like') {
 			$predicate = 'LIKE \'%' . $this->_slave->real_escape_string($val->value) . '%\'';
+		} elseif ($val->type == 'like_custom') {
+			$predicate = 'LIKE \'' . $this->_slave->real_escape_string($val->value) . '\'';
 		} elseif ($val->type == 'lt') {
 			$predicate = '< \'' . $this->_slave->real_escape_string($val->value) . '\'';
 		} elseif ($val->type == 'lte') {
@@ -222,7 +260,7 @@ class MysqliMasterSlaveDriver {
 			// renumber the array so $val[0] exists
 			$val = array_values($val);
 
-			if (!empty($val) && is_a($val[0], 'ParagonCondition')) {
+			if (!empty($val) && $val[0] instanceof ParagonCondition) {
 				$predicate = array();
 				
 				foreach ($val as $condition) {
@@ -249,7 +287,7 @@ class MysqliMasterSlaveDriver {
 			$predicate = '= \'' . $val . '\'';
 		} elseif (is_bool($val)) {
 			$predicate = '= ' . ($val ? 'true' : 'false');
-		} elseif (is_a($val, 'ParagonCondition')) {
+		} elseif ($val instanceof ParagonCondition) {
 			$predicate = $this->_paragon_condition($val);
 			
 			if (empty($predicate)) {

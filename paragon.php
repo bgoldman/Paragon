@@ -595,6 +595,12 @@ class Paragon {
 			return $value;
 		}
 		
+		if ($value instanceof ParagonOperator) {
+			$value = clone $value;
+			$value->value = self::_localize_dates($class_name, $value->value, $to_gmt);
+			return $value;
+		}
+		
 		$timezone = new DateTimeZone(self::_get_timezone($class_name));
 		$gmt_now = new DateTime('now');
 		$timezone_offset = $timezone->getOffset($gmt_now);
@@ -651,6 +657,10 @@ class Paragon {
 				continue;
 			}
 			
+			if (is_int($field)) {
+				continue;
+			}
+
 			$params[$field] = self::_localize_date($class_name, $field, $value, $to_gmt);
 		}
 		
@@ -770,40 +780,7 @@ class Paragon {
 
 			foreach ($relationship_data as $relationship => $data) {
 				if (!empty($params['conditions'])) {
-					$corrected_keys = array();
-					
-					foreach ($params['conditions'] as $key => $val) {
-						$prefix1 = $relationship . '_';
-						$prefix2 = $relationship . '.';
-					
-						if (
-							!in_array($key, $fields)
-							&& (
-								strpos($key, $prefix1) === 0
-								|| strpos($key, $prefix2) === 0
-							)
-						) {
-							if (
-								isset($corrected_relationships[$key])
-								&& $corrected_relationships[$key] != $relationship
-							) {
-								continue;
-							}
-							
-							if (strpos($key, $prefix1) == 0) {
-								$corrected_relationships[$key] = $relationship;
-							}
-							
-							if (empty($found_relationships[$relationship])) {
-								$found_relationships[$relationship] = array(
-									'conditions' => array(),
-									'order' => array(),
-								);
-							}
-							
-							$found_relationships[$relationship]['conditions'][$key] = $val;
-						}
-					}
+					list($corrected_relationships, $found_relationships) = self::_relationship_params_relationships($class_name, $corrected_relationships, $found_relationships, $relationship, $params['conditions']);
 				}
 				
 				if (!empty($params['order'])) {
@@ -1043,6 +1020,57 @@ class Paragon {
 		}
 
 		return array($tables, $params);
+	}
+	
+	private static function _relationship_params_relationships($class_name, $corrected_relationships, $found_relationships, $relationship, $conditions) {
+		$fields = self::_get_static($class_name, '_fields');
+		
+		foreach ($conditions as $key => $val) {
+			if (is_int($key)) {
+				if (is_array($val)) {
+					list($corrected_relationships, $found_relationships) = self::_relationship_params_relationships($class_name, $corrected_relationships, $found_relationships, $relationship, $val);
+					continue;
+				}
+				
+				if ($val instanceof ParagonOperator) {
+					list($corrected_relationships, $found_relationships) = self::_relationship_params_relationships($class_name, $corrected_relationships, $found_relationships, $relationship, $val->value);
+					continue;
+				}
+			}
+			
+			$prefix1 = $relationship . '_';
+			$prefix2 = $relationship . '.';
+		
+			if (
+				!in_array($key, $fields)
+				&& (
+					strpos($key, $prefix1) === 0
+					|| strpos($key, $prefix2) === 0
+				)
+			) {
+				if (
+					isset($corrected_relationships[$key])
+					&& $corrected_relationships[$key] != $relationship
+				) {
+					continue;
+				}
+				
+				if (strpos($key, $prefix1) == 0) {
+					$corrected_relationships[$key] = $relationship;
+				}
+				
+				if (empty($found_relationships[$relationship])) {
+					$found_relationships[$relationship] = array(
+						'conditions' => array(),
+						'order' => array(),
+					);
+				}
+				
+				$found_relationships[$relationship]['conditions'][$key] = $val;
+			}
+		}
+		
+		return array($corrected_relationships, $found_relationships);
 	}
 	
 	private static function _require_model($class) {
@@ -1376,6 +1404,10 @@ class Paragon {
 	public static function get_timezone() {
 		$class_name = get_called_class();
 		return self::_get_timezone($class_name);
+	}
+	
+	public static function operator($type, $value) {
+		return new ParagonOperator($type, $value);
 	}
 	
 	public static function order($order) {
@@ -2034,6 +2066,16 @@ if (!function_exists('get_called_class')) {
 }
 
 class ParagonCondition {
+	public $type;
+	public $value;
+
+	public function __construct($type, $value) {
+		$this->type = $type;
+		$this->value = $value;
+	}
+}
+
+class ParagonOperator {
 	public $type;
 	public $value;
 
