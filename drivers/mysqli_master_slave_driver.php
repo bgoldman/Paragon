@@ -185,8 +185,9 @@ class MysqliMasterSlaveDriver {
 		return $where_string;
 	}
 	
-	private function _order($order) {
-		$orders = explode(',', $order);
+	private function _order($orders) {
+		if (!isset($orders)) $orders = array();
+		if (!is_array($orders)) $orders = array($orders);
 
 		foreach ($orders as $key => $order) {
 			if (substr($order, 0, 1) == '-') {

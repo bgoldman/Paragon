@@ -683,11 +683,11 @@ class Paragon {
 		$class_name = get_called_class();
 		self::_init($class_name);
 		$fields = self::_get_static($class_name, '_fields');
-		$orders = explode(',', $order);
+		$orders = !is_array($order) ? explode(',', $order) : $order;
 		
 		$relationships = self::_get_static($class_name, '_relationships');
 		$aliases = self::_get_static($class_name, '_aliases');
-		$return_order_parts = array();
+		$new_order = array();
 
 		foreach ($orders as $key => $order) {
 			$order = trim($order);
@@ -723,10 +723,10 @@ class Paragon {
 				$order = '-' . $order;
 			}
 			
-			$return_order_parts[] = $order;
+			$new_order[] = $order;
 		}
 		
-		return implode(',', $return_order_parts);
+		return $new_order;
 	}
 	
 	private static function _relationship_params($class_name, $params) {
@@ -737,7 +737,7 @@ class Paragon {
 			'type' => 'primary',
 		);
 		$extra_tables = array();
-		$order_parts = !empty($params['order']) ? explode(',', $params['order']) : array();
+		if (!isset($params['order'])) $params['order'] = array();
 		
 		// relational queries can be made only in the conditions and order params
 		if (!empty($params['conditions']) || !empty($params['order'])) {
@@ -753,33 +753,33 @@ class Paragon {
 			// the corresponding relational values for those parameters.
 			$relationship_params = array();
 
-			foreach ($relationships as $relationship => $data) {
+			// look through all the conditions and order fields to find all of the
+			// relationships being used in order to populate $relationship_params
+			foreach ($relationships as $relationship_key => $relationship) {
+				// add conditions to $relationship_params
 				if (!empty($params['conditions'])) {
-					$relationship_params = self::_relationship_params_conditions($class_name, $relationship_params, $relationship, $params['conditions']);
+					$relationship_params = self::_relationship_params_conditions($class_name, $relationship_params, $relationship_key, $params['conditions']);
 				}
 				
+				// add order fields to $relationship_params
 				if (!empty($params['order'])) {
-					foreach ($order_parts as $key => $order) {
-						$order = trim($order);
-						$prefix = $relationship . '.';
+					foreach ($params['order'] as $key => $order) {
+						$prefix = $relationship_key . '.';
 						$order_field = $order;
 						
 						if (substr($order, 0, 1) == '-') {
 							$order_field = substr($order, 1);
 						}
 					
-						if (
-							!in_array($order_field, $fields)
-							&& strpos($order_field, $prefix) === 0
-						) {
-							if (empty($relationship_params[$relationship])) {
-								$relationship_params[$relationship] = array(
+						if (!in_array($order_field, $fields) && strpos($order_field, $prefix) === 0) {
+							if (empty($relationship_params[$relationship_key])) {
+								$relationship_params[$relationship_key] = array(
 									'conditions' => array(),
 									'order' => array(),
 								);
 							}
 							
-							$relationship_params[$relationship]['order'][$key] = $order;
+							$relationship_params[$relationship_key]['order'][$key] = $order;
 						}
 					}
 				}
@@ -788,7 +788,9 @@ class Paragon {
 			foreach ($relationship_params as $relationship_key => $matches) {
 				$relationship = $relationships[$relationship_key];
 				
-				foreach ($matches['conditions'] as $key => $data) {
+				// for each condition, find which tables we need to join on and which
+				// relationships each table is joined on
+				foreach ($matches['conditions'] as $key => $condition) {
 					$field = substr($key, strlen($relationship_key) + 1);
 					$field = self::_alias($relationship['class'], $field);
 					unset($params['conditions'][$key]);
@@ -804,7 +806,7 @@ class Paragon {
 					if (strpos($field, '.')) {
 						list($these_tables, $these_params) = self::_relationship_params($relationship['class'], array(
 							'conditions' => array(
-								$field => $data,
+								$field => $condition,
 							),
 						));
 						
@@ -828,12 +830,13 @@ class Paragon {
 							$extra_tables[$this_table] = $table_info;
 						}
 					} else {
-						$params['conditions'][$relationship_key . '.' . $field] = $data;
+						$params['conditions'][$relationship_key . '.' . $field] = $condition;
 					}
 				}
 				
+				// for each order field, find which tables we need to join on and which
+				// relationships each table is joined on
 				foreach ($matches['order'] as $key => $order) {
-					$order = trim($order);
 					$order_field = $order;
 					$reverse_order = false;
 					
@@ -857,13 +860,11 @@ class Paragon {
 						list($these_tables, $these_params) = self::_relationship_params($relationship['class'], array(
 							'order' => $field,
 						));
-						
-						$these_order_parts = explode(',', $these_params['order']);
-						
-						foreach ($these_order_parts as $order_key => $order_value) {
+
+						foreach ($these_params['order'] as $order_key => $order_value) {
 							$this_order = trim($order_value);
 							if ($reverse_order) $this_order = '-' . $this_order;
-							$order_parts[$order_key] = $this_order;
+							$params['order'][$order_key] = $this_order;
 						}
 						
 						foreach ($these_tables as $this_table => $table_info) {
@@ -884,7 +885,7 @@ class Paragon {
 					} else {
 						$order = $relationship_key . '.' . $field;
 						if ($reverse_order) $order = '-' . $order;
-						$order_parts[$key] = $order;
+						$params['order'][$key] = $order;
 					}
 				}
 
@@ -959,33 +960,27 @@ class Paragon {
 		
 		// for each order part, for the ones that are not already relational,
 		// prefix the order part with the table name
-		if (!empty($order_parts)) {
-			foreach ($order_parts as $key => $order) {
-				$order = trim($order);
-				
-				if (strpos($order, '.') !== false) {
-					continue;
-				}
-				
-				$reverse_order = false;
-				
-				if (substr($order, 0, 1) == '-') {
-					$order = substr($order, 1);
-					$reverse_order = true;
-				}
-				
-				$order = $table . '_primary.' . $order;
-				if ($reverse_order) $order = '-' . $order;
-				$order_parts[$key] = $order;
+		foreach ($params['order'] as $key => $order) {
+			if (strpos($order, '.') !== false) {
+				continue;
 			}
 			
-			$params['order'] = implode(',', $order_parts);
+			$reverse_order = false;
+			
+			if (substr($order, 0, 1) == '-') {
+				$order = substr($order, 1);
+				$reverse_order = true;
+			}
+			
+			$order = $table . '_primary.' . $order;
+			if ($reverse_order) $order = '-' . $order;
+			$params['order'][$key] = $order;
 		}
 		
 		return array($tables, $params);
 	}
 	
-	private static function _relationship_params_conditions($class_name, $relationship_params, $relationship, $conditions) {
+	private static function _relationship_params_conditions($class_name, $relationship_params, $relationship_key, $conditions) {
 		$fields = self::_get_static($class_name, '_fields');
 		
 		// for each condition, check for relationships. for any relationships that are
@@ -994,29 +989,29 @@ class Paragon {
 		foreach ($conditions as $key => $val) {
 			if (is_int($key)) {
 				if (is_array($val)) {
-					$relationship_params = self::_relationship_params_conditions($class_name, $relationship_params, $relationship, $val);
+					$relationship_params = self::_relationship_params_conditions($class_name, $relationship_params, $relationship_key, $val);
 					continue;
 				}
 				
 				if ($val instanceof ParagonOperator) {
-					$relationship_params = self::_relationship_params_conditions($class_name, $relationship_params, $relationship, $val->value);
+					$relationship_params = self::_relationship_params_conditions($class_name, $relationship_params, $relationship_key, $val->value);
 					continue;
 				}
 				
 				continue;
 			}
 			
-			$prefix = $relationship . '.';
+			$prefix = $relationship_key . '.';
 		
 			if (!in_array($key, $fields) && strpos($key, $prefix) === 0) {
-				if (!isset($relationship_params[$relationship])) {
-					$relationship_params[$relationship] = array(
+				if (!isset($relationship_params[$relationship_key])) {
+					$relationship_params[$relationship_key] = array(
 						'conditions' => array(),
 						'order' => array(),
 					);
 				}
 				
-				$relationship_params[$relationship]['conditions'][$key] = $val;
+				$relationship_params[$relationship_key]['conditions'][$key] = $val;
 			}
 		}
 		
@@ -1136,6 +1131,7 @@ class Paragon {
 			unset($params['conditions'][$field]);
 		}
 
+		if (array_key_exists('order', $params)) unset($params['order']);
 		list($tables, $params) = self::_relationship_params($class_name, $params);
 		$primary_key = self::_alias($class_name, $primary_key);
 		
