@@ -31,13 +31,13 @@ class MysqliMasterSlaveDriver {
 	
 	private function _create_complex_where($conn, $table, $params) {
 		if (empty($params['conditions'])) {
-			return '';
+			return false;
 		}
 	
 		$conditions = $this->_create_complex_where_part($conn, $table, $params['conditions']);
 		
 		if (empty($conditions)) {
-			return '';
+			return false;
 		}
 		
 		return ' WHERE ' . implode(' AND ', $conditions);
@@ -69,10 +69,13 @@ class MysqliMasterSlaveDriver {
 				continue;
 			}
 			
+			/*
 			if (is_array($val)) {
-				$val = Paragon::operator('or', $val);
+				  $val = Paragon::operator('or', $val);
 			}
+			*/
 			
+			/*
 			if ($val instanceof ParagonOperator) {
 				$val_conditions = $this->_create_complex_where_part($conn, $table, $val->value);
 				
@@ -84,6 +87,7 @@ class MysqliMasterSlaveDriver {
 				$sql_conditions[] = '(' . implode(' ' . strtoupper($val->type) . ' ', $val_conditions) . ')';
 				continue;
 			}
+			*/
 			
 			if (!empty($val) && $val[0] instanceof ParagonCondition) {
 				$val_conditions = array();
