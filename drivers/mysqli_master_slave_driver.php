@@ -31,7 +31,7 @@ class MysqliMasterSlaveDriver {
 	
 	private function _create_complex_where($conn, $table, $params) {
 		if (empty($params['conditions'])) {
-			return false;
+			return '';
 		}
 	
 		$conditions = $this->_create_complex_where_part($conn, $table, $params['conditions']);

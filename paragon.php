@@ -702,10 +702,9 @@ class Paragon {
 				$no_continue = false;
 				
 				foreach ($relationships as $relationship => $data) {
-					$prefix1 = $relationship . '_';
-					$prefix2 = $relationship . '.';
+					$prefix = $relationship . '.';
 				
-					if (strpos($order, $prefix1) === 0 || strpos($order, $prefix2) === 0) {
+					if (strpos($order, $prefix) === 0) {
 						$no_continue = true;
 						break;
 					}
@@ -744,39 +743,25 @@ class Paragon {
 		if (!empty($params['conditions']) || !empty($params['order'])) {
 			$fields = self::_get_static($class_name, '_fields');
 			$relationships = self::_get_static($class_name, '_relationships');
-			$found_relationships = array();
-
-			// sort $relationships by reverse string length.
-			// this prevents shorter relationship keys
-			// that are subsets of longer relationship keys
-			// from causing a bug when finding relationships below
-			$relationship_keys = array_keys($relationships);
-			$sorted_relationship_keys = array();
 			
-			if (!empty($relationship_keys)) {
-				$sorted_relationship_keys = array_combine($relationship_keys, array_map('strlen', $relationship_keys));
-			}
-			
-			arsort($sorted_relationship_keys);
-			$sorted_relationships = array();
-			
-			foreach ($sorted_relationship_keys as $relationship => $strlen) {
-				$sorted_relationships[$relationship] = $relationships[$relationship];
-			}
-			
-			$relationships = $sorted_relationships;
-			$corrected_relationships = array();
+			// $relationship_params is an associative array representing all
+			// relationships found within conditions and orders for the purpose of
+			// keeping track of which conditions and orders have been found for each
+			// relationship; for example, users.name and categories.title would result
+			// in $relationship_params having keys for 'users' and 'categories'. the
+			// corresponding values contain 'conditions' and 'order' arrays containing
+			// the corresponding relational values for those parameters.
+			$relationship_params = array();
 
 			foreach ($relationships as $relationship => $data) {
 				if (!empty($params['conditions'])) {
-					list($corrected_relationships, $found_relationships) = self::_relationship_params_relationships($class_name, $corrected_relationships, $found_relationships, $relationship, $params['conditions']);
+					$relationship_params = self::_relationship_params_conditions($class_name, $relationship_params, $relationship, $params['conditions']);
 				}
 				
 				if (!empty($params['order'])) {
 					foreach ($order_parts as $key => $order) {
 						$order = trim($order);
-						$prefix1 = $relationship . '_';
-						$prefix2 = $relationship . '.';
+						$prefix = $relationship . '.';
 						$order_field = $order;
 						
 						if (substr($order, 0, 1) == '-') {
@@ -785,36 +770,22 @@ class Paragon {
 					
 						if (
 							!in_array($order_field, $fields)
-							&& (
-								strpos($order_field, $prefix1) === 0
-								|| strpos($order_field, $prefix2) === 0
-							)
+							&& strpos($order_field, $prefix) === 0
 						) {
-							if (
-								isset($corrected_relationships[$order_field])
-								&& $corrected_relationships[$order_field] != $relationship
-							) {
-								continue;
-							}
-							
-							if (strpos($order, $prefix1) == 0) {
-								$corrected_relationships[$order] = $relationship;
-							}
-							
-							if (empty($found_relationships[$relationship])) {
-								$found_relationships[$relationship] = array(
+							if (empty($relationship_params[$relationship])) {
+								$relationship_params[$relationship] = array(
 									'conditions' => array(),
 									'order' => array(),
 								);
 							}
 							
-							$found_relationships[$relationship]['order'][$key] = $order;
+							$relationship_params[$relationship]['order'][$key] = $order;
 						}
 					}
 				}
 			}
 
-			foreach ($found_relationships as $relationship_key => $matches) {
+			foreach ($relationship_params as $relationship_key => $matches) {
 				$relationship = $relationships[$relationship_key];
 				
 				foreach ($matches['conditions'] as $key => $data) {
@@ -977,6 +948,7 @@ class Paragon {
 			}
 		}
 		
+		// add $extra_tables to $tables that aren't already in $tables
 		foreach ($extra_tables as $this_table => $info) {
 			if (!empty($tables[$this_table])) {
 				continue;
@@ -985,6 +957,8 @@ class Paragon {
 			$tables[$this_table] = $info;
 		}
 		
+		// for each order part, for the ones that are not already relational,
+		// prefix the order part with the table name
 		if (!empty($order_parts)) {
 			foreach ($order_parts as $key => $order) {
 				$order = trim($order);
@@ -1011,55 +985,42 @@ class Paragon {
 		return array($tables, $params);
 	}
 	
-	private static function _relationship_params_relationships($class_name, $corrected_relationships, $found_relationships, $relationship, $conditions) {
+	private static function _relationship_params_conditions($class_name, $relationship_params, $relationship, $conditions) {
 		$fields = self::_get_static($class_name, '_fields');
 		
+		// for each condition, check for relationships. for any relationships that are
+		// found, set $relationship_params. do this recursively because conditions can
+		// be nested.
 		foreach ($conditions as $key => $val) {
 			if (is_int($key)) {
 				if (is_array($val)) {
-					list($corrected_relationships, $found_relationships) = self::_relationship_params_relationships($class_name, $corrected_relationships, $found_relationships, $relationship, $val);
+					$relationship_params = self::_relationship_params_conditions($class_name, $relationship_params, $relationship, $val);
 					continue;
 				}
 				
 				if ($val instanceof ParagonOperator) {
-					list($corrected_relationships, $found_relationships) = self::_relationship_params_relationships($class_name, $corrected_relationships, $found_relationships, $relationship, $val->value);
+					$relationship_params = self::_relationship_params_conditions($class_name, $relationship_params, $relationship, $val->value);
 					continue;
 				}
+				
+				continue;
 			}
 			
-			$prefix1 = $relationship . '_';
-			$prefix2 = $relationship . '.';
+			$prefix = $relationship . '.';
 		
-			if (
-				!in_array($key, $fields)
-				&& (
-					strpos($key, $prefix1) === 0
-					|| strpos($key, $prefix2) === 0
-				)
-			) {
-				if (
-					isset($corrected_relationships[$key])
-					&& $corrected_relationships[$key] != $relationship
-				) {
-					continue;
-				}
-				
-				if (strpos($key, $prefix1) == 0) {
-					$corrected_relationships[$key] = $relationship;
-				}
-				
-				if (empty($found_relationships[$relationship])) {
-					$found_relationships[$relationship] = array(
+			if (!in_array($key, $fields) && strpos($key, $prefix) === 0) {
+				if (!isset($relationship_params[$relationship])) {
+					$relationship_params[$relationship] = array(
 						'conditions' => array(),
 						'order' => array(),
 					);
 				}
 				
-				$found_relationships[$relationship]['conditions'][$key] = $val;
+				$relationship_params[$relationship]['conditions'][$key] = $val;
 			}
 		}
 		
-		return array($corrected_relationships, $found_relationships);
+		return $relationship_params;
 	}
 	
 	private static function _require_model($class) {
