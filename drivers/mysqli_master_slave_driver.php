@@ -43,20 +43,35 @@ class MysqliMasterSlaveDriver {
 		return ' WHERE ' . implode(' AND ', $conditions);
 	}
 	
-	private function _create_complex_where_part($conn, $table, $conditions) {
+	private function _create_complex_where_part($conn, $table, $conditions, $override_field = null) {
 		$sql_conditions = array();
 		
 		foreach ($conditions as $field => $val) {
+			if ($override_field) $field = $override_field;
+		
 			// if we have an empty array, it means this query is requesting "IN ('')" which never returns anything,
 			// so just return early with no results
 			if (is_array($val) && count($val) == 0) {
 				return false;
 			}
 			
-			// if we have an empty operator, it means this query will never returns anything,
-			// so just return early with no results
-			if ($val instanceof ParagonOperator && count($val->value) == 0) {
-				return false;
+			if ($val instanceof ParagonOperator) {
+				// if we have an empty operator, it means this query will never returns anything,
+				// so just return early with no results
+				if (count($val->value) == 0) {
+					return false;
+				}
+				
+				$override = !is_int($field) ? $field : null;
+				$val_conditions = $this->_create_complex_where_part($conn, $table, $val->value, $override);
+				
+				if (count($val_conditions) == 1) {
+					$sql_conditions[] = $val_conditions[0];
+					continue;
+				}
+				
+				$sql_conditions[] = '(' . implode(' ' . strtoupper($val->type) . ' ', $val_conditions) . ')';
+				continue;
 			}
 			
 			if (!is_int($field)) {
@@ -69,39 +84,33 @@ class MysqliMasterSlaveDriver {
 				continue;
 			}
 			
-			/*
 			if (is_array($val)) {
-				  $val = Paragon::operator('or', $val);
-			}
-			*/
-			
-			/*
-			if ($val instanceof ParagonOperator) {
-				$val_conditions = $this->_create_complex_where_part($conn, $table, $val->value);
-				
-				if (count($val_conditions) == 1) {
-					$sql_conditions[] = $val_conditions[0];
-					continue;
-				}
-				
-				$sql_conditions[] = '(' . implode(' ' . strtoupper($val->type) . ' ', $val_conditions) . ')';
-				continue;
-			}
-			*/
-			
-			if (!empty($val) && $val[0] instanceof ParagonCondition) {
 				$val_conditions = array();
 				
 				foreach ($val as $k => $v) {
-					$these_val_conditions = $this->_where_condition($table, $k, $v);
+					if ($v instanceof ParagonCondition) {
+						$these_val_conditions = $this->_where_condition($table, $k, $v);
+						
+						foreach ($these_val_conditions as $val_condition) {
+							$val_conditions[] = $val_condition;
+						}
+						
+						continue;
+					}
 					
-					foreach ($these_val_conditions as $val_condition) {
-						$val_conditions[] = $val_condition;
+					if ($v instanceof ParagonOperator) {
+						$these_val_conditions = $this->_create_complex_where_part($conn, $table, $v->value);
+						$val_conditions[] = '(' . implode(' ' . strtoupper($v->type) . ' ', $these_val_conditions) . ')';
+						continue;
 					}
 				}
 				
+				if (empty($val_conditions)) {
+					continue;
+				}
+				
 				if (count($val_conditions) == 1) {
-					$sql_conditions = $val_conditions[0];
+					$sql_conditions[] = $val_conditions[0];
 					continue;
 				}
 				
@@ -109,6 +118,7 @@ class MysqliMasterSlaveDriver {
 				continue;
 			}
 
+			// if we got this far, it's a string
 			if (strlen($val) > 0) $sql_conditions[] = $val;
 		}
 		
@@ -181,8 +191,7 @@ class MysqliMasterSlaveDriver {
 			$wheres[] = implode(' AND ', $where);
 		}
 
-		$where_string = ' WHERE (' . implode(') OR (', $wheres) . ')';
-		return $where_string;
+		return ' WHERE (' . implode(') OR (', $wheres) . ')';
 	}
 	
 	private function _order($orders) {
