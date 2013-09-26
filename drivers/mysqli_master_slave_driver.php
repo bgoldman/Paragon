@@ -36,8 +36,12 @@ class MysqliMasterSlaveDriver {
 	
 		$conditions = $this->_create_complex_where_part($conn, $table, $params['conditions']);
 		
-		if (empty($conditions)) {
+		if ($conditions === false) {
 			return false;
+		}
+		
+		if (is_array($conditions) && count($conditions) == 0) {
+			return '';
 		}
 		
 		return ' WHERE ' . implode(' AND ', $conditions);
@@ -120,10 +124,6 @@ class MysqliMasterSlaveDriver {
 
 			// if we got this far, it's a string
 			if (strlen($val) > 0) $sql_conditions[] = $val;
-		}
-		
-		if (empty($sql_conditions)) {
-			return false;
 		}
 
 		return $sql_conditions;
