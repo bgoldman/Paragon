@@ -594,6 +594,10 @@ class Paragon {
 	private static function _localize_date($class_name, $field, $value, $to_gmt) {
 		$validations = self::_get_static($class_name, 'validations');
 		
+		if (empty($value)) {
+			return $value;
+		}
+		
 		if ($value instanceof ParagonCondition) {
 			$value = clone $value;
 			$value->value = self::_localize_date($class_name, $field, $value->value, $to_gmt);
@@ -606,39 +610,28 @@ class Paragon {
 			return $value;
 		}
 		
-		$timezone = new DateTimeZone(self::_get_timezone($class_name));
-		$gmt_now = new DateTime('now');
-		$timezone_offset = $timezone->getOffset($gmt_now);
-		
 		if (
-			!empty($value)
+			$field != 'date_created'
+			&& $field != 'date_updated'
 			&& (
-				$field == 'date_created'
-				|| $field == 'date_updated'
+				empty($validations[$field])
 				|| (
-					!empty($validations[$field])
-					&& (
-						!empty($validations[$field]['date'])
-						|| !empty($validations[$field]['datetime'])
-					)
+					empty($validations[$field]['date'])
+					&& empty($validations[$field]['datetime'])
 				)
 			)
 		) {
-			if ($to_gmt) {
-				$value = gmdate('Y-m-d H:i:s', strtotime($value) + $timezone_offset);
-			} else {
-				$value = date('Y-m-d H:i:s', strtotime($value) + date('Z') - $timezone_offset);
-			}
-		} elseif (
-			!empty($value)
-			&& !empty($validations[$field])
-			&& !empty($validations[$field]['timestamp'])
-		) {
-			if ($to_gmt) {
-				$value -= date('Z') - $timezone_offset;
-			} else {
-				$value += date('Z') - $timezone_offset;
-			}
+			return $value;
+		}
+		
+		$timezone = new DateTimeZone(self::_get_timezone($class_name));
+		$gmt_now = new DateTime($value);
+		$timezone_offset = $timezone->getOffset($gmt_now);
+
+		if ($to_gmt) {
+			$value = gmdate('Y-m-d H:i:s', strtotime($value) + $timezone_offset);
+		} else {
+			$value = date('Y-m-d H:i:s', strtotime($value) + date('Z') - $timezone_offset);
 		}
 		
 		return $value;
