@@ -615,10 +615,7 @@ class Paragon {
 			&& $field != 'date_updated'
 			&& (
 				empty($validations[$field])
-				|| (
-					empty($validations[$field]['date'])
-					&& empty($validations[$field]['datetime'])
-				)
+				|| empty($validations[$field]['datetime'])
 			)
 		) {
 			return $value;
